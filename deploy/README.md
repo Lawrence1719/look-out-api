@@ -2,6 +2,8 @@
 
 Agent: codex. Deployment templates require live verification on the chosen host. No cloud resources have been created.
 
+For a first local run, start with the [Windows, macOS, or Linux setup guides](../docs/README.md). Shared instructions cover [database storage and backups](../docs/usage.md) and [Telegram setup and delivery verification](../docs/telegram.md). These deployment templates are a separate step from running the demo in a terminal.
+
 ## Persistent host
 
 Run the daemon on a host that can reach the targets, separate from the services it monitors. Before choosing a free host, verify its current free-resource limits, account requirements, and idle-reclamation policy. This repository does not provision Oracle resources or guarantee that any provider remains free.

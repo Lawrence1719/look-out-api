@@ -12,6 +12,7 @@ Candidate families considered: laboratory notebook, technical journal, trail fie
 - Signal #bb421f; signal pale #f4e4da; healthy #476a44; dark #242a25.
 - Heading: Manrope variable, weights 500–700. Body: DM Sans variable. Code/data: IBM Plex Mono.
 - Max content width 1280px. Desktop sidebar 236px. Body measure 68ch.
+- Documentation uses the full main area with 24–48px desktop margins. Above a 760px content width, explanations and command examples share a two-column reading grid; smaller containers stack them. Prose keeps a 70ch maximum measure. Compact headings, 16px row spacing, and inline copy controls prioritize setup instructions over empty space.
 - Thin rules organize content; no decorative glow, gradients, fake customer metrics, emoji, stock art, or equal feature-card grid.
 
 ## Motion
@@ -19,3 +20,5 @@ The illustrative check sequence is the authored motion: observations advance, a 
 
 ## Responsive and accessibility
 Desktop persistent sidebar; mobile collapsible navigation. Same links and semantic hierarchy. Focus-visible rings and custom scrollbars use the signal palette. No horizontal page overflow at 375px. Demo announces only manual changes. Labels accompany meaningful icons. Copy controls report success/failure.
+
+Documentation density refinement · Agent: codex · 2026-11-25. Preserved the established colors, typography, OS anchors, and setup content while expanding the documentation canvas. Scrollable command examples accept keyboard focus. Checked the static export at 320, 375, 768, 1024, 1440, and 1920px widths; desktop and mobile compositions were visually reviewed.

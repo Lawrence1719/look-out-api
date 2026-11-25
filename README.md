@@ -2,16 +2,27 @@
 
 A self-hosted Rust CLI and daemon for checking API health and configured response behavior. Keep observations in SQLite and send Telegram notifications when a target goes down or recovers. A separate static Next.js website introduces the project and documents setup.
 
-**Status:** initial development build. Six check types and the monitoring core are implemented and locally tested. No public release, production deployment, or live Telegram delivery has been verified yet. The complete roadmap remains in [spec.md](./spec.md).
+**Status:** initial development build. Six check types and the monitoring core are implemented. CI checks Rust on Windows, macOS, and Linux, and the website on Linux. Live Telegram DOWN/RECOVERED delivery was verified with the local demo. There is no verified tagged binary release or production monitor deployment yet. The complete roadmap remains in [spec.md](./spec.md).
 
-## Run locally
+## Start on your operating system
 
-Install stable Rust. If Rust was just installed in this session, load its shell environment first:
+| Operating system | Setup guide |
+| --- | --- |
+| Windows (PowerShell) | [Install, configure, and run](./docs/getting-started/windows.md) |
+| macOS (Terminal) | [Install, configure, and run](./docs/getting-started/macos.md) |
+| Linux (Debian/Ubuntu examples) | [Install, configure, and run](./docs/getting-started/linux.md) |
+
+The [documentation index](./docs/README.md) also covers [Telegram setup](./docs/telegram.md), [SQLite, commands, backups, and updates](./docs/usage.md), and [troubleshooting](./docs/troubleshooting.md). The monitor is self-hosted; each user supplies their own targets and optional Telegram bot. Database creation is automatic. Python is used for the optional demo; Node.js is needed only for the information website.
+
+## Quick start on macOS / Linux
+
+Install stable Rust and your OS build tools using the guides above. If Cargo is not available after installing with rustup, reopen the terminal or load `. "$HOME/.cargo/env"` in zsh/bash. From the source checkout:
 
 ```sh
-. "$HOME/.cargo/env"
 cargo build --release --locked
-cp look-out-api.example.toml look-out-api.toml
+test -f look-out-api.toml || cp look-out-api.example.toml look-out-api.toml
+test -f .env || cp .env.example .env
+chmod 600 .env look-out-api.toml
 ./target/release/look-out-api validate
 ```
 
@@ -92,7 +103,7 @@ Response bodies are limited to 1 MiB for HTTP/flow checks. Errors retain categor
 
 ## Telegram and durable incidents
 
-Set both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your environment or an untracked `.env`. [.env.example](./.env.example) lists supported settings. The optional `TELEGRAM_API_BASE_URL` supports a custom Bot API origin; remote origins require HTTPS, and loopback HTTP is permitted for tests.
+Set both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your environment or an untracked `.env`. [.env.example](./.env.example) lists supported settings. Follow the [Telegram guide](./docs/telegram.md) to create a bot, choose a private chat or group, retrieve its chat ID, and verify alerts. The integration sends outbound alerts; it does not reply to `/start` or other commands. Restart the daemon after changing settings. The optional `TELEGRAM_API_BASE_URL` supports a custom Bot API origin; remote origins require HTTPS, and loopback HTTP is permitted for tests.
 
 Initial success establishes UP silently. Three consecutive failures open an incident by default; two consecutive successes close it. Continued failures do not enqueue repeated DOWN events.
 
