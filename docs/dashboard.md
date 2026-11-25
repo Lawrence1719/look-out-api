@@ -21,7 +21,22 @@ Open **http://127.0.0.1:8080/** on the same machine. The `LOOK_OUT_API_BIND` env
 
 An HTTP 200 can still fail when the expected response text is missing. A PASS proves only the assertions you configured; it does not prove every business function works. Configure a multi-step flow to test an actual sequence such as session creation followed by an authenticated request.
 
-Manual tests do **not** write scheduled history, change incident counters, or send alerts. Their latest result is kept in the running daemon's memory and disappears on restart. Tests use the saved configuration; there is no browser form for arbitrary destinations, headers, bodies, or tokens. Be aware that a configured POST or multi-step flow executes its configured API operations when you run it.
+Manual tests do **not** write scheduled history, change incident counters, or send alerts. Their latest result is kept in the running daemon's memory and disappears on restart. Tests use the saved configuration. The Add API form saves basic HTTP checks; headers, request bodies, tokens, and advanced targets are configured in TOML. Be aware that a configured POST or multi-step flow executes its configured API operations when you run it.
+
+## Add an API without restarting
+
+1. Click **Add API** in the target list.
+2. Enter a unique nonsecret name and the full HTTP/HTTPS URL. Choose GET or HEAD.
+3. Set an expected status (blank accepts any 2xx), optional case-sensitive response text for GET, interval (at least five seconds), and a timeout shorter than that interval.
+4. Click **Save & start monitoring**. The target is saved to the same TOML file used to start the daemon and scheduled immediately. Select it to see the first real observation or use **Run check** for a manual test.
+
+Saving starts scheduled requests and uses your existing incident thresholds and alert settings. A failing endpoint can still be saved and monitored. Nothing is requested just by filling out the form. Keep URLs and expected text private; they are stored locally in your configuration, but excluded from dashboard snapshots and logs. Environment placeholders and embedded URL credentials are not accepted in this form.
+
+Existing comments, secret placeholders, file permissions, and target state are preserved. Saves use an atomic file replacement and a sibling write lock. Avoid editing the configuration in another editor while adding APIs: if a changed file is detected, the save is rejected and you must restart the monitor to load that configuration. Symlinked, read-only, missing, or oversized configuration disables additions. Duplicate names, including names retained in local history, are rejected.
+
+If a file saves but database registration fails, the dashboard explicitly says that a restart is needed. Check database access and restart; startup loads the saved API. If the connection drops during a save, refresh and check the target list before retrying. The form keeps your draft when a save fails.
+
+Authentication headers, POST bodies, multi-step flows, and other check types remain available through TOML; restart after those edits. Editing or deleting targets through the dashboard is not yet implemented.
 
 ## Watch ongoing monitoring
 
@@ -39,8 +54,8 @@ If you run the daemon on another machine, use an SSH tunnel to its loopback port
 
 - **Checking…**: a manual or scheduled check is already in progress for that target. Wait for it to finish; target executions are serialized.
 - **Disconnected**: confirm the daemon is running, then click Refresh. The information site at port 3000 is a different service.
-- **No targets**: add a target to your TOML configuration and restart the daemon.
-- **Old configuration**: changes take effect after a daemon restart; there is no hot reload.
+- **No targets**: use Add API for an HTTP check, or configure advanced targets in TOML and restart.
+- **Old configuration**: dashboard additions activate immediately; manual TOML edits require a daemon restart.
 - **Uncertain manual result**: reconnect and inspect the latest manual result before retrying an API operation.
 
 Target URLs, headers, bodies, tokens, and extracted flow values are excluded from dashboard responses. Keep target and flow-step names nonsecret. See [troubleshooting](./troubleshooting.md) for database, build-tool, and Telegram issues.

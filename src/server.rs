@@ -1,9 +1,10 @@
 use crate::{
     dashboard::{Dashboard, RunError},
+    registration::{AddError, NewApi},
     store::Store,
 };
 use axum::{
-    extract::{Path, State},
+    extract::{rejection::JsonRejection, DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
     middleware,
     response::{Html, IntoResponse, Response},
@@ -33,6 +34,7 @@ pub fn dashboard_router(
         .route("/dashboard.js", get(script))
         .route("/fonts/{name}", get(font_asset))
         .route("/api/dashboard", get(snapshot))
+        .route("/api/targets", post(add_api).layer(DefaultBodyLimit::max(16 * 1024)))
         .route("/api/targets/{name}/check", post(run_check))
         .route("/healthz", get(|| async { "ok" }))
         .route("/heartbeat/{name}", post(heartbeat))
@@ -145,6 +147,59 @@ async fn snapshot(
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
+fn require_action(headers: &HeaderMap, action: &str) -> Result<(), StatusCode> {
+    let host = local_host(headers)?;
+    let origin = format!("http://{host}");
+    if headers.get("origin").and_then(|value| value.to_str().ok()) != Some(origin.as_str())
+        || headers
+            .get("x-look-out-action")
+            .and_then(|value| value.to_str().ok())
+            != Some(action)
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(())
+}
+async fn add_api(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+    payload: Result<Json<NewApi>, JsonRejection>,
+) -> Response {
+    let dashboard = match local_dashboard(&state, &headers) {
+        Ok(dashboard) => dashboard.clone(),
+        Err(code) => return code.into_response(),
+    };
+    if require_action(&headers, "add-api").is_err() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error":"Use the local dashboard to add APIs."})),
+        )
+            .into_response();
+    }
+    let input = match payload {
+        Ok(Json(input)) => input,
+        Err(error) => {
+            return (
+                if error.status() == StatusCode::PAYLOAD_TOO_LARGE {
+                    StatusCode::PAYLOAD_TOO_LARGE
+                } else {
+                    StatusCode::BAD_REQUEST
+                },
+                Json(serde_json::json!({"error":"Check the form fields and try again."})),
+            )
+                .into_response()
+        }
+    };
+    // Finish a save even when the browser disconnects. The config is the restart recovery source.
+    match tokio::spawn(async move { dashboard.add_api(input).await }).await {
+        Ok(Ok(added)) => (if added.monitoring { StatusCode::CREATED } else { StatusCode::ACCEPTED }, Json(added)).into_response(),
+        Ok(Err(error)) => {
+            let status = match error { AddError::Invalid(_,_) => StatusCode::BAD_REQUEST, AddError::Duplicate|AddError::Changed|AddError::Busy => StatusCode::CONFLICT, AddError::Disabled => StatusCode::SERVICE_UNAVAILABLE, AddError::Storage => StatusCode::INTERNAL_SERVER_ERROR };
+            (status, Json(serde_json::json!({"error":error.message(),"field":error.field()}))).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"The save result is uncertain. Refresh before trying again."}))).into_response(),
+    }
+}
 async fn run_check(
     State(state): State<ServerState>,
     Path(name): Path<String>,
@@ -154,17 +209,7 @@ async fn run_check(
         Ok(dashboard) => dashboard,
         Err(code) => return code.into_response(),
     };
-    let host = match local_host(&headers) {
-        Ok(host) => host,
-        Err(code) => return code.into_response(),
-    };
-    let origin = format!("http://{host}");
-    if headers.get("origin").and_then(|v| v.to_str().ok()) != Some(origin.as_str())
-        || headers
-            .get("x-look-out-action")
-            .and_then(|v| v.to_str().ok())
-            != Some("run-check")
-    {
+    if require_action(&headers, "run-check").is_err() {
         return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!({"error":"Use the local dashboard to run checks."})),

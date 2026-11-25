@@ -5,7 +5,9 @@
   let snapshot = null;
   let selected = null;
   let connected = false;
-  let refreshing = false;
+  let refreshPromise = null;
+  let formOpen = false;
+  let saving = false;
   let timer;
   let detailKey = "";
   let targetKey = "";
@@ -37,21 +39,37 @@
     const names = snapshot.targets.map((target) => target.name);
     const key = JSON.stringify(names);
     if (key !== targetKey) {
-      const buttons = names.map((name) => {
-        const button = element("button", undefined, "target-button");
-        button.type = "button";
-        button.append(element("strong", name));
-        const meta = element("span", undefined, "target-meta");
-        meta.append(element("span"), element("span"));
-        button.append(meta);
-        button.addEventListener("click", () => {
-          selected = name;
-          detailKey = "";
-          render();
-        });
-        return button;
+      const list = byId("target-list");
+      const existing = new Map(
+        [...list.querySelectorAll("button")].map((button) => [
+          button.dataset.target,
+          button,
+        ]),
+      );
+      if (!existing.size) list.replaceChildren();
+      names.forEach((name, index) => {
+        let button = existing.get(name);
+        if (!button) {
+          button = element("button", undefined, "target-button");
+          button.type = "button";
+          button.dataset.target = name;
+          button.append(element("strong", name));
+          const meta = element("span", undefined, "target-meta");
+          meta.append(element("span"), element("span"));
+          button.append(meta);
+          button.addEventListener("click", () => {
+            if (saving) return;
+            selected = name;
+            formOpen = false;
+            detailKey = "";
+            render();
+          });
+        }
+        if (list.children[index] !== button)
+          list.insertBefore(button, list.children[index] || null);
       });
-      replace("target-list", ...buttons);
+      for (const button of existing.values())
+        if (!names.includes(button.dataset.target)) button.remove();
       targetKey = key;
     }
     [...byId("target-list").children].forEach((button, index) => {
@@ -255,6 +273,20 @@
     byId("connection-label").textContent = connected
       ? "Connected · refreshes every 2s"
       : "Disconnected · showing last received data";
+    const canAdd = connected && Boolean(snapshot?.add_api_enabled);
+    byId("add-api-toggle").disabled = !canAdd || saving;
+    byId("add-api-toggle").setAttribute("aria-expanded", String(formOpen));
+    byId("add-api-unavailable").hidden =
+      !snapshot || Boolean(snapshot.add_api_enabled);
+    byId("add-api-unavailable").textContent =
+      snapshot?.add_api_unavailable ||
+      "Adding APIs is unavailable for this monitor.";
+    byId("add-api-panel").hidden = !formOpen;
+    byId("add-api-save").disabled = !canAdd || saving;
+    byId("add-api-save").textContent = saving
+      ? "Saving…"
+      : "Save & start monitoring";
+    byId("add-api-cancel").disabled = saving;
     if (!snapshot) {
       if (!connected) {
         byId("loading-detail").querySelector("h2").textContent =
@@ -268,8 +300,8 @@
       selected = snapshot.targets[0]?.name;
     renderTargets();
     byId("loading-detail").hidden = true;
-    byId("empty-state").hidden = snapshot.targets.length > 0;
-    byId("detail-content").hidden = snapshot.targets.length === 0;
+    byId("empty-state").hidden = formOpen || snapshot.targets.length > 0;
+    byId("detail-content").hidden = formOpen || snapshot.targets.length === 0;
     const target = snapshot.targets.find((target) => target.name === selected);
     if (!target) return;
     const busy = pending.has(target.name) || Boolean(target.activity);
@@ -311,10 +343,17 @@
     renderHistory(target);
   }
 
-  async function refresh() {
-    if (refreshing || document.hidden) return;
+  function refresh(force = false) {
+    if (refreshPromise) return refreshPromise;
+    if (document.hidden && force !== true) return Promise.resolve();
+    refreshPromise = loadSnapshot().finally(() => {
+      refreshPromise = null;
+    });
+    return refreshPromise;
+  }
+
+  async function loadSnapshot() {
     clearTimeout(timer);
-    refreshing = true;
     byId("refresh").disabled = true;
     try {
       const response = await fetch("/api/dashboard", {
@@ -331,12 +370,132 @@
         `Cannot reach the local monitor. Check that the daemon is running, then refresh.${snapshot ? ` Last snapshot: ${date(snapshot.server_time)}.` : ""}`;
       byId("connection-error").hidden = false;
     } finally {
-      refreshing = false;
       byId("refresh").disabled = false;
       render();
       if (!document.hidden) timer = setTimeout(refresh, 2000);
     }
   }
+
+  const form = byId("add-api-form");
+  const errorNode = byId("add-api-error");
+  function clearFormErrors() {
+    errorNode.hidden = true;
+    for (const field of form.querySelectorAll("input, select")) {
+      field.setCustomValidity("");
+      field.removeAttribute("aria-invalid");
+      const description = field
+        .getAttribute("aria-describedby")
+        ?.replace(/ ?add-api-error/g, "");
+      if (description) field.setAttribute("aria-describedby", description);
+      else field.removeAttribute("aria-describedby");
+    }
+  }
+  form.addEventListener("input", clearFormErrors);
+  byId("api-method").addEventListener("change", () => {
+    const head = byId("api-method").value === "HEAD";
+    byId("api-text").disabled = head;
+    clearFormErrors();
+  });
+  byId("add-api-toggle").addEventListener("click", () => {
+    formOpen = true;
+    byId("add-api-notice").hidden = true;
+    render();
+    byId("api-name").focus();
+  });
+  byId("add-api-cancel").addEventListener("click", () => {
+    formOpen = false;
+    form.reset();
+    byId("api-text").disabled = false;
+    clearFormErrors();
+    render();
+    byId("add-api-toggle").focus();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (saving || !connected || !snapshot?.add_api_enabled) return;
+    clearFormErrors();
+    const data = new FormData(form);
+    const timeout = byId("api-timeout");
+    if (Number(data.get("timeout_secs")) >= Number(data.get("interval_secs")))
+      timeout.setCustomValidity(
+        "Timeout must be shorter than the check interval.",
+      );
+    if (!form.reportValidity()) return;
+    const input = {
+      name: String(data.get("name")).trim(),
+      url: String(data.get("url")).trim(),
+      method: data.get("method"),
+      expected_status: data.get("expected_status")
+        ? Number(data.get("expected_status"))
+        : null,
+      expected_body_contains: data.get("expected_body_contains") || null,
+      interval_secs: Number(data.get("interval_secs")),
+      timeout_secs: Number(data.get("timeout_secs")),
+    };
+    saving = true;
+    render();
+    for (const field of form.querySelectorAll("input, select"))
+      field.disabled = true;
+    try {
+      const response = await fetch("/api/targets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Look-Out-Action": "add-api",
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(20000),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        errorNode.textContent =
+          result.error ||
+          "The API could not be saved. Refresh before trying again.";
+        errorNode.hidden = false;
+        const field = form.elements.namedItem(result.field);
+        if (
+          field instanceof HTMLInputElement ||
+          field instanceof HTMLSelectElement
+        ) {
+          field.setAttribute("aria-invalid", "true");
+          field.setAttribute(
+            "aria-describedby",
+            `${field.getAttribute("aria-describedby") || ""} add-api-error`.trim(),
+          );
+          field.dataset.focusError = "true";
+        }
+        return;
+      }
+      formOpen = false;
+      form.reset();
+      byId("add-api-notice").textContent = `${result.name}: ${result.message}`;
+      byId("add-api-notice").hidden = false;
+      if (refreshPromise) await refreshPromise;
+      await refresh(true);
+      if (result.monitoring) selected = result.name;
+      detailKey = "";
+      render();
+      const target = [...byId("target-list").children].find(
+        (button) => button.dataset.target === selected,
+      );
+      (target || byId("add-api-toggle")).focus();
+    } catch {
+      errorNode.textContent =
+        "The save result is uncertain. Refresh and check the target list before trying again. Your draft is still here.";
+      errorNode.hidden = false;
+    } finally {
+      saving = false;
+      for (const field of form.querySelectorAll("input, select"))
+        field.disabled = false;
+      byId("api-text").disabled = byId("api-method").value === "HEAD";
+      render();
+      const invalid = form.querySelector('[data-focus-error="true"]');
+      if (invalid) {
+        invalid.removeAttribute("data-focus-error");
+        invalid.focus();
+      }
+    }
+  });
 
   byId("run-check").addEventListener("click", async () => {
     const target = snapshot?.targets.find((item) => item.name === selected);
@@ -387,7 +546,7 @@
       await refresh();
     }
   });
-  byId("refresh").addEventListener("click", refresh);
+  byId("refresh").addEventListener("click", () => refresh());
   document.addEventListener("visibilitychange", () => {
     clearTimeout(timer);
     if (!document.hidden) refresh();

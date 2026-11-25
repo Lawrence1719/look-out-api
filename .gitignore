@@ -21,3 +21,5 @@ test-results/
 state*.json.lock
 
 /website/next-env.d.ts
+
+*.edit.lock

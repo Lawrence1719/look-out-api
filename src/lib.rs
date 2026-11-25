@@ -4,6 +4,7 @@ pub mod cli;
 pub mod config;
 pub mod dashboard;
 pub mod error;
+pub mod registration;
 pub mod report;
 pub mod scheduler;
 pub mod server;

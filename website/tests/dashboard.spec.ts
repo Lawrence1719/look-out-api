@@ -122,3 +122,72 @@ test("dashboard handles disconnect, empty state, keyboard focus and mobile layou
     page.getByRole("heading", { name: "No configured targets" }),
   ).toBeVisible();
 });
+
+test("add API validates a draft and starts real scheduled monitoring without restart", async ({
+  page,
+}) => {
+  await selectDemo(page);
+  await page.getByRole("button", { name: "Add API", exact: true }).click();
+  const name = `new-health-${Date.now()}`;
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page
+    .getByLabel("API URL", { exact: true })
+    .fill("http://127.0.0.1:4182/health");
+  await page.getByLabel("Response contains", { exact: false }).fill("demo-ok");
+  await page.getByLabel("Check interval (seconds)").fill("5");
+  const timeout = page.getByLabel("Timeout (seconds)");
+  await timeout.fill("5");
+  const save = page.getByRole("button", { name: "Save & start monitoring" });
+  await save.click();
+  await expect(timeout).toBeFocused();
+  await timeout.fill("1");
+  await page.waitForTimeout(2200);
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(name);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await save.click();
+  await expect(page.locator("#add-api-notice")).toContainText(
+    "Monitoring starts now",
+  );
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(page.locator("#history-rows")).toContainText("200", {
+    timeout: 8000,
+  });
+  await expect(page.locator("#last-observation")).toContainText("PASS");
+  await page.reload();
+  await page.getByRole("button", { name: new RegExp(name) }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Add API", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page
+    .getByLabel("API URL", { exact: true })
+    .fill("http://127.0.0.1:4182/health");
+  await save.click();
+  await expect(page.locator("#add-api-error")).toContainText("already exists");
+  await expect(page.getByLabel("Name", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("API URL", { exact: true })).toHaveValue(
+    "http://127.0.0.1:4182/health",
+  );
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Add API", exact: true }),
+  ).toBeFocused();
+});

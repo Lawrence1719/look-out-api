@@ -5,7 +5,7 @@
 - Website: website/; Next.js static export, TypeScript, Motion, Lucide.
 - Website preview: npm --prefix website run dev (127.0.0.1:3000).
 - Local demo: python3 examples/demo_api.py (127.0.0.1:3001).
-- Optional daemon dashboard/status/heartbeat server defaults to 127.0.0.1:8080 when enabled. Local dashboard assets: src/dashboard/; shared per-target runner: src/dashboard.rs. Manual dashboard tests do not persist incident/history changes.
+- Optional daemon dashboard/status/heartbeat server defaults to 127.0.0.1:8080 when enabled. Local dashboard assets: src/dashboard/; shared per-target runner: src/dashboard.rs. Manual dashboard tests do not persist incident/history changes. Add API saves GET/HEAD targets to the original config and schedules them immediately; POST /api/targets is loopback/same-origin/action-header restricted.
 - Dashboard browser checks: npm run test:dashboard (inside website/); requires Rust on PATH. Local-only fixture uses ports 4181/4182 and temporary SQLite.
 - Database: DATABASE_URL, default sqlite://look-out-api.db.
 - Config: LOOK_OUT_API_CONFIG, default ./look-out-api.toml.

@@ -156,7 +156,7 @@ grace_secs = 90000
 
 Set `LOOK_OUT_API_HEARTBEAT_TOKEN`. The daemon automatically enables its endpoint at `127.0.0.1:8080` for heartbeat targets; override using `--bind` or `LOOK_OUT_API_BIND` when needed. Send `POST /heartbeat/nightly-backup` with `Authorization: Bearer <token>`. A new target receives an initial grace period starting at creation. Subsequent scheduled checks compare the latest ping to `grace_secs`, using the same failure/recovery thresholds. Existing heartbeat targets can be inspected by normal one-off checks using the same database.
 
-The optional HTTP server includes a [local dashboard](./docs/dashboard.md) and `/healthz`. Start with `run --bind 127.0.0.1:8080` and open http://127.0.0.1:8080 to watch real scheduled observations, inspect incidents, and run manual tests of configured targets. Manual tests do not change incident state or send alerts. See the [deployment guide](./deploy/README.md) for host, container, network, backup, and GitHub setup.
+The optional HTTP server includes a [local dashboard](./docs/dashboard.md) and `/healthz`. Start with `run --bind 127.0.0.1:8080` and open http://127.0.0.1:8080 to watch real scheduled observations, inspect incidents, run manual tests of configured targets, and add HTTP APIs without restarting. Manual tests do not change incident state or send alerts. See the [deployment guide](./deploy/README.md) for host, container, network, backup, and GitHub setup.
 
 ## Website
 

@@ -75,6 +75,28 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
+    pub async fn register_target(
+        &self,
+        target: &crate::config::Target,
+        defaults: &crate::config::Defaults,
+    ) -> anyhow::Result<()> {
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO targets(name,type,interval_secs,created_at) VALUES(?,?,?,?) RETURNING id",
+        )
+        .bind(&target.name)
+        .bind(target.kind.as_str())
+        .bind(target.interval(defaults) as i64)
+        .bind(Utc::now().to_rfc3339())
+        .fetch_one(&mut *tx)
+        .await?;
+        sqlx::query("INSERT INTO target_state(target_id) VALUES(?)")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
     pub async fn record(
         &self,
         name: &str,

@@ -134,7 +134,7 @@ async fn execute(cli: Cli) -> anyhow::Result<bool> {
             let store = Store::connect(&cli.database)
                 .await
                 .context("cannot initialize monitor database")?;
-            scheduler::run(config, store, sender, bind).await?;
+            scheduler::run(config, store, sender, bind, cli.config).await?;
         }
         Command::Status => {
             let store = Store::connect(&cli.database)

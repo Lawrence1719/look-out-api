@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use look_out_api::{config::Config, dashboard::Dashboard, server, store::Store};
+use look_out_api::{config::Config, scheduler, store::Store};
 use std::sync::{
     atomic::{AtomicU8, AtomicUsize, Ordering},
     Arc,
@@ -78,28 +78,12 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         axum::serve(mock, app).await.expect("demo server");
     });
-    let config = Config::parse("[defaults]\ninterval_secs=5\ntimeout_secs=1\nfailure_threshold=2\nrecovery_threshold=2\n[[target]]\nname='demo-api'\nurl='http://127.0.0.1:4182/health'\nexpected_status=200\nexpected_body_contains='demo-ok'\n[[target]]\nname='checkout-flow'\ntype='flow'\n[[target.step]]\nname='create-session'\nurl='http://127.0.0.1:4182/session'\nextract={token='/token'}\n[[target.step]]\nname='read-orders'\nurl='http://127.0.0.1:4182/orders'\nheaders={authorization='Bearer {{token}}'}\n[[target]]\nname='slow-api'\nurl='http://127.0.0.1:4182/slow'")?;
+    let text = "[defaults]\ninterval_secs=5\ntimeout_secs=1\nfailure_threshold=2\nrecovery_threshold=2\n[[target]]\nname='demo-api'\nurl='http://127.0.0.1:4182/health'\nexpected_status=200\nexpected_body_contains='demo-ok'\n[[target]]\nname='checkout-flow'\ntype='flow'\n[[target.step]]\nname='create-session'\nurl='http://127.0.0.1:4182/session'\nextract={token='/token'}\n[[target.step]]\nname='read-orders'\nurl='http://127.0.0.1:4182/orders'\nheaders={authorization='Bearer {{token}}'}\n[[target]]\nname='slow-api'\nurl='http://127.0.0.1:4182/slow'";
+    let config = Config::parse(text)?;
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("monitor.toml");
+    std::fs::write(&path, text)?;
     let store = Store::connect("sqlite::memory:").await?;
-    store.sync(&config).await?;
-    let dashboard = Dashboard::new(&config, store.clone())?;
-    for target in config.targets {
-        let runner = dashboard.clone();
-        tokio::spawn(async move {
-            let mut ticks = tokio::time::interval(std::time::Duration::from_secs(5));
-            loop {
-                ticks.tick().await;
-                runner
-                    .scheduled(&target.name)
-                    .await
-                    .expect("scheduled demo");
-            }
-        });
-    }
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:4181").await?;
-    axum::serve(
-        listener,
-        server::dashboard_router(store, None, Some(dashboard)),
-    )
-    .await?;
+    scheduler::run(config, store, None, Some("127.0.0.1:4181".into()), path).await?;
     Ok(())
 }
