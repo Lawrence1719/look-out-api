@@ -16,12 +16,13 @@ The [documentation index](./docs/README.md) also covers [Telegram setup](./docs/
 
 ## Quick start on macOS / Linux
 
-Install stable Rust. If Rust was just installed in this session, load its shell environment first:
+Install stable Rust and your OS build tools using the guides above. If Cargo is not available after installing with rustup, reopen the terminal or load `. "$HOME/.cargo/env"` in zsh/bash. From the source checkout:
 
 ```sh
-. "$HOME/.cargo/env"
 cargo build --release --locked
-cp look-out-api.example.toml look-out-api.toml
+test -f look-out-api.toml || cp look-out-api.example.toml look-out-api.toml
+test -f .env || cp .env.example .env
+chmod 600 .env look-out-api.toml
 ./target/release/look-out-api validate
 ```
 
