@@ -1,0 +1,13 @@
+.git
+.github
+target
+website
+.env
+.env.*
+*.db
+*.db-*
+*.db.lock
+state*.json*
+look-out-api.toml
+artifacts
+.impeccable

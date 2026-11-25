@@ -1,0 +1,97 @@
+name: Release binaries
+on:
+  push:
+    tags: ["v[0-9]*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            suffix: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: ".exe"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Install musl compiler
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package binary and checksum
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          BINARY_SUFFIX: ${{ matrix.suffix }}
+        run: |
+          python - <<'PY'
+          import hashlib, os, pathlib, tarfile, zipfile
+          target = os.environ['RELEASE_TARGET']
+          suffix = os.environ['BINARY_SUFFIX']
+          binary = pathlib.Path('target') / target / 'release' / ('look-out-api' + suffix)
+          pathlib.Path('dist').mkdir(exist_ok=True)
+          archive = pathlib.Path('dist') / ('look-out-api-' + target + ('.zip' if suffix else '.tar.gz'))
+          if suffix:
+              with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+                  output.write(binary, binary.name)
+                  output.write('look-out-api.example.toml')
+                  output.write('README.md')
+                  output.write('LICENSE')
+          else:
+              with tarfile.open(archive, 'w:gz') as output:
+                  output.add(binary, arcname=binary.name)
+                  output.add('look-out-api.example.toml')
+                  output.add('README.md')
+                  output.add('LICENSE')
+          archive.with_name(archive.name + '.sha256').write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/*
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: dist
+      - name: Create tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" dist/* --verify-tag --title "$RELEASE_TAG" --generate-notes

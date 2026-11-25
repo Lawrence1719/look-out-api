@@ -1,0 +1,11 @@
+[defaults]
+interval_secs = 30
+timeout_secs = 5
+failure_threshold = 3
+recovery_threshold = 2
+
+[[target]]
+name = "private-demo-api"
+url = "http://demo-api:3001/health"
+expected_status = 200
+expected_body_contains = "ok"

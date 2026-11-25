@@ -1,0 +1,26 @@
+[Unit]
+Description=Look Out API monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=look-out-api
+Group=look-out-api
+WorkingDirectory=/var/lib/look-out-api
+EnvironmentFile=/opt/look-out-api/.env
+Environment=LOOK_OUT_API_CONFIG=/opt/look-out-api/look-out-api.toml
+Environment=DATABASE_URL=sqlite:///var/lib/look-out-api/look-out-api.db
+ExecStart=/opt/look-out-api/look-out-api run
+Restart=always
+RestartSec=5
+TimeoutStopSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/look-out-api
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
