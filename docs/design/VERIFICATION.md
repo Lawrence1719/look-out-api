@@ -116,3 +116,13 @@ Local preview restoration exposed generated Next.js type references changing bet
 - Ran the documented validate/status/check/run/history/report/alerts flow against a temporary database and the local demo, with Telegram credentials explicitly absent. Automatic schema creation, recorded history, UP status, and graceful shutdown passed.
 - Rust fmt, Clippy, and all 23 tests passed in an isolated checkout without the owner's local credentials. The website clean install, formatting, type generation/typecheck, static build, and all six browser/accessibility tests passed.
 - Desktop/mobile documentation layout, OS anchor navigation, and Windows command rendering were checked against the static export. Native Windows and Linux installation walkthroughs were not manually executed on this Mac. Rust CI covers the three hosted OS runners; native service installers, extra platform/architecture combinations, tagged release packaging, and Docker runtime remain separate verification work.
+
+## Documentation density refinement
+
+2026-11-25 · Agent: codex · Branch: `docs/cross-platform-setup`.
+
+- Removed the narrow documentation width cap and paired instructions with command examples on wide containers. Reduced heading, section, and code-block spacing; retained a readable prose measure and stacked layout on smaller containers.
+- Preserved all existing setup examples, OS anchors, configuration explanations, and implemented/planned distinctions. Updated one directional reference after moving the build example.
+- Website formatting, type generation/typecheck, and static export passed. All six browser tests passed, including automated accessibility checks. The initial accessibility run identified scrollable examples without keyboard access; focusable code regions fixed the issue before the passing rerun.
+- Measured the static export at 320, 375, 768, 1024, 1440, and 1920px with fonts loaded: no horizontal page overflow. Visually reviewed desktop, intermediate, mobile, and OS-anchor views. Verified Windows command copying preserves the complete text and keyboard focus reaches its scrolling code region. The scoped Impeccable layout scan reported no findings.
+- This change affects the information site only; local monitoring credentials and runtime data were not changed.
