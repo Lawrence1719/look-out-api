@@ -1,6 +1,6 @@
 # Look Out API — initial build verification
 
-Checked: 2026-11-25 · Agent: codex · Local branch: `feat/initial-build` (draft PR [#1](https://github.com/Lawrence1719/look-out-api/pull/1))
+Checked: 2026-11-25 · Agent: codex · Initial implementation: `feat/initial-build` ([PR #1](https://github.com/Lawrence1719/look-out-api/pull/1), now merged). Documentation follow-up: `docs/cross-platform-setup`.
 
 Sources: [overview](./OVERVIEW.md), [project spec](../../spec.md), and the actual commands/tests below. This records an initial working increment, not completion of the full roadmap or a live deployment.
 
@@ -46,7 +46,7 @@ Sources: [overview](./OVERVIEW.md), [project spec](../../spec.md), and the actua
 - Local daemon smoke: initial UP, DOWN, stop/restart while DOWN, confirmed recovery, two persisted notification events, successful status/history/report/alerts queries, duplicate daemon lock, and clean SIGTERM shutdown.
 - Backup smoke: nine successful online backups, seven retained copies, restored-copy SQLite integrity check passed.
 
-Automated accessibility checks cover detectable issues, not a full human accessibility audit. Telegram tests use local mocks; no real message was sent.
+Automated accessibility checks cover detectable issues, not a full human accessibility audit. Automated Telegram tests use local mocks. The later manual live-delivery verification is recorded below.
 
 ## Stage status
 
@@ -58,8 +58,10 @@ Automated accessibility checks cover detectable issues, not a full human accessi
 | GitHub workflows, systemd, backup and container assets | Built; remote execution/host setup pending |
 | Postgres/Redis protocol, gRPC and browser checks | Not implemented; retained in roadmap |
 | Expanded security rules and per-finding escalation alerts | Not implemented; initial availability-based security alerts only |
-| Public personal repository and draft PR | Published; review pending |
-| Tagged release, real Telegram test and public site | Needs setup |
+| Public personal repository and initial PR | Published; PR #1 merged |
+| Live Telegram delivery with local demo | Verified manually; see follow-up below |
+| Tagged release and production monitor host | Needs setup |
+| Public information site | Pages configured; current hosted deployment evidence is separate from local site checks |
 
 ## Repository standards adapted to this personal project
 
@@ -79,9 +81,9 @@ Automated accessibility checks cover detectable issues, not a full human accessi
 
 | Item | Owner | Blocks |
 | --- | --- | --- |
-| Review initial implementation and visual direction | Lawrence | Initial merge |
-| Review and merge PR #1; verify site and tagged release jobs | Lawrence + Codex | Published site and release |
-| Provide real target config and Telegram credentials locally | Lawrence | Live DOWN/RECOVERED delivery test |
+| Review cross-platform documentation follow-up | Lawrence | Documentation merge |
+| Verify site and tagged release jobs | Lawrence + Codex | Verified hosted site and release |
+| Configure intended real targets | Lawrence | Monitoring beyond the local demo |
 | Start a Docker engine and run container/Compose verification | Lawrence + Codex | Verified container delivery; engine unavailable during this build |
 | Provision and validate a host that stays within current free allowances | Lawrence | Always-on monitoring |
 | Configure second-watcher secrets and validate cache continuity | Lawrence + Codex | Independent coverage |
@@ -94,8 +96,23 @@ No account credentials, hosted identifiers or unverified public URLs were invent
 
 The initial public draft uses MIT as the recommended implementation default following the owner's open-source direction; bundled font licenses are retained. Release archives include the source license.
 
-Draft PR [#1](https://github.com/Lawrence1719/look-out-api/pull/1) is open. `main` retains only the GitHub-created starter README. Required checks are Rust on Linux/macOS/Windows and Website, with an up-to-date branch required and admin enforcement enabled; force pushes and deletions are disabled. Solo-owner PRs do not require an additional reviewer approval. Pages is configured with `build_type=workflow` and awaits a reviewed merge followed by successful main CI. No site deployment or release was started. Font copyright and license notices are included in the static export.
+At initial publication, draft PR [#1](https://github.com/Lawrence1719/look-out-api/pull/1) was open and `main` retained only the GitHub-created starter README. The owner has since merged it. Required checks are Rust on Linux/macOS/Windows and Website, with an up-to-date branch required and admin enforcement enabled; force pushes and deletions are disabled. Solo-owner PRs do not require an additional reviewer approval. Pages is configured with `build_type=workflow`; hosted deployment results must be verified separately. Font copyright and license notices are included in the static export.
 
 Hosted release packaging remains unverified until a version tag is intentionally published. The successful PR run does not claim release or deployment validation.
 
 Local preview restoration exposed generated Next.js type references changing between development and builds. Following the installed Next.js guide, `next-env.d.ts` is now ignored and the typecheck command runs `next typegen` before TypeScript, so a fresh checkout does not depend on generated files being committed. Default source links now point to the verified public repository, and the roadmap no longer lists repository publication as pending.
+
+## Manual Telegram setup and delivery
+
+2026-11-25 · Agent: codex. The owner created a dedicated bot, saved its token locally, and initiated its private chat. The destination was retrieved without logging the token or full API response. Telegram confirmed a setup message. The monitor was restarted with delivery enabled; stopping only the local demo produced DOWN after three consecutive failures, and restoring it produced RECOVERED after two successes. SQLite recorded two ordered transition events, both delivered, with zero open incidents or pending notifications afterward. The demo and monitor were left running and the target was UP. Private credentials, chat identifiers, and operational database files remain untracked. No production API was disrupted.
+
+## Cross-platform documentation follow-up
+
+2026-11-25 · Agent: codex · Branch: `docs/cross-platform-setup`, based on merged PR #1.
+
+- Added [Windows](../getting-started/windows.md), [macOS](../getting-started/macos.md), and [Linux](../getting-started/linux.md) source-setup guides with native shell syntax, prerequisites, local configuration, demo/daemon terminals, and stop/restart behavior.
+- Added shared [usage/database/backup](../usage.md), [Telegram](../telegram.md), and [troubleshooting](../troubleshooting.md) documentation. The static website exposes the same OS entry points and setup explanations.
+- Checked relative Markdown links across the documentation; parsed the documented Python examples; executed the backup example against a temporary database and proved an existing backup is preserved.
+- Ran the documented validate/status/check/run/history/report/alerts flow against a temporary database and the local demo, with Telegram credentials explicitly absent. Automatic schema creation, recorded history, UP status, and graceful shutdown passed.
+- Rust fmt, Clippy, and all 23 tests passed in an isolated checkout without the owner's local credentials. The website clean install, formatting, type generation/typecheck, static build, and all six browser/accessibility tests passed.
+- Desktop/mobile documentation layout, OS anchor navigation, and Windows command rendering were checked against the static export. Native Windows and Linux installation walkthroughs were not manually executed on this Mac. Rust CI covers the three hosted OS runners; native service installers, extra platform/architecture combinations, tagged release packaging, and Docker runtime remain separate verification work.

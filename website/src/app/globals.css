@@ -966,6 +966,11 @@ svg {
   margin-top: 17px;
   color: var(--muted);
 }
+.docs-page p a {
+  color: var(--signal);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .docs-page p > code {
   background: var(--paper-deep);
   padding: 2px 4px;
