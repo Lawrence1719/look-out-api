@@ -19,3 +19,5 @@ test-results/
 .impeccable/
 
 state*.json.lock
+
+/website/next-env.d.ts

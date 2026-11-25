@@ -17,7 +17,9 @@ export function Sidebar() {
   const [active, setActive] = useState("overview");
   const pathname = usePathname();
   const isDocs = pathname.includes("/docs");
-  const repository = process.env.NEXT_PUBLIC_REPOSITORY_URL;
+  const repository =
+    process.env.NEXT_PUBLIC_REPOSITORY_URL ||
+    "https://github.com/Lawrence1719/look-out-api";
   useEffect(() => {
     if (isDocs) return;
     const observer = new IntersectionObserver(
@@ -99,14 +101,10 @@ export function Sidebar() {
           </Link>
           <a
             className="resource-link"
-            href={
-              repository ||
-              `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/docs/#source`
-            }
+            href={repository}
             onClick={() => setOpen(false)}
-            {...(repository
-              ? { target: "_blank", rel: "noopener noreferrer" }
-              : {})}
+            target="_blank"
+            rel="noopener noreferrer"
           >
             <Code2 size={16} /> Source code
             <ArrowUpRight size={14} />

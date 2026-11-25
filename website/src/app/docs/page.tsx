@@ -14,7 +14,9 @@ function Code({ children }: { children: string }) {
   );
 }
 export default function Docs() {
-  const repository = process.env.NEXT_PUBLIC_REPOSITORY_URL;
+  const repository =
+    process.env.NEXT_PUBLIC_REPOSITORY_URL ||
+    "https://github.com/Lawrence1719/look-out-api";
   return (
     <article className="docs-page">
       <Link className="text-link" href="/">
@@ -157,24 +159,16 @@ export default function Docs() {
       </section>
       <section id="source" className="section-anchor">
         <h2>Source and project status</h2>
-        {repository ? (
-          <p>
-            <a
-              className="text-link"
-              href={repository}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open the GitHub repository <ArrowUpRight size={16} />
-            </a>
-          </p>
-        ) : (
-          <p>
-            The public repository is being prepared. Installation currently
-            starts from a source checkout; a repository link will appear here
-            when it is published.
-          </p>
-        )}
+        <p>
+          <a
+            className="text-link"
+            href={repository}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open the GitHub repository <ArrowUpRight size={16} />
+          </a>
+        </p>
         <p>
           Planned work includes database protocol checks, gRPC health, optional
           browser checks, expanded security checks, and live deployment

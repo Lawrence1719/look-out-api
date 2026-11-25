@@ -242,8 +242,8 @@ export default function Home() {
           <div>
             <span className="roadmap-state planned">Before release</span>
             <p>
-              Live alert validation, deployment verification, tagged binaries,
-              and a public source repository.
+              Live alert validation, deployment verification, and tagged
+              binaries.
             </p>
           </div>
         </div>
