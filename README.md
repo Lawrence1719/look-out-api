@@ -186,6 +186,6 @@ GitHub Actions runs Rust checks across Linux/macOS/Windows and the website check
 
 ## Ownership and contribution
 
-Personal project. The repository-local commit email is `lawrence.dizon@proton.me`; global Git identity is unchanged. The public repository is [Lawrence1719/look-out-api](https://github.com/Lawrence1719/look-out-api). Work on feature branches and use pull requests. Released under the [MIT License](./LICENSE); bundled fonts retain their included licenses. Crate publishing remains disabled until release preparation.
+Personal project. The repository-local commit email is `lawrence.dizon@proton.me`; global Git identity is unchanged. The public repository is [Lawrence1719/look-out-api](https://github.com/Lawrence1719/look-out-api). Work on feature branches and use pull requests. Released under the [MIT License](./LICENSE); bundled fonts retain their [included licenses](./website/public/licenses/), which are exported with the site. Crate publishing remains disabled until release preparation.
 
 No usage telemetry is enabled. After publication, repository activity and release-download counts can provide approximate adoption signals without collecting monitored target data.
