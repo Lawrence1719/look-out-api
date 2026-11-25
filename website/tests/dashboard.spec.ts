@@ -127,6 +127,19 @@ test("add API validates a draft and starts real scheduled monitoring without res
   page,
 }) => {
   await selectDemo(page);
+  const resources = page.getByRole("navigation", { name: "Project resources" });
+  await expect(
+    resources.getByRole("link", { name: "Website", exact: true }),
+  ).toHaveAttribute("href", "https://lawrence1719.github.io/look-out-api/");
+  await expect(
+    resources.getByRole("link", { name: "Documentation", exact: true }),
+  ).toHaveAttribute(
+    "href",
+    "https://lawrence1719.github.io/look-out-api/docs/",
+  );
+  await expect(
+    resources.getByRole("link", { name: "Documentation", exact: true }),
+  ).toHaveAttribute("target", "_blank");
   await page.getByRole("button", { name: "Add API", exact: true }).click();
   const name = `new-health-${Date.now()}`;
   await page.getByLabel("Name", { exact: true }).fill(name);

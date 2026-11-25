@@ -13,6 +13,10 @@ Start the [local demo and monitor](./README.md#start-on-your-operating-system) u
 
 Open **http://127.0.0.1:8080/** on the same machine. The `LOOK_OUT_API_BIND` environment setting can enable the same listener. Stop an existing daemon before restarting it; two daemons cannot share one database. No Node.js server or cloud account is needed to use the dashboard.
 
+## Website and documentation
+
+The dashboard header includes **Website** and **Documentation** links. They open in a new tab, keeping any unfinished API form available. By default they point to the public information website. To use a local preview instead, set `LOOK_OUT_API_SITE_URL=http://127.0.0.1:3000/` in your local environment and restart the daemon. This is optional; the dashboard itself does not need Node.js or the information-site server. The configured URL must be HTTP/HTTPS with no credentials, query, or fragment; invalid values fall back to the public site.
+
 ## Run a visual test
 
 1. Select a configured target.

@@ -46,6 +46,7 @@ export default function Docs() {
       </header>
       <nav className="docs-index" aria-label="On this page">
         <a href="#installation">Build & run</a>
+        <a href="#dashboard">Dashboard</a>
         <a href="#database">Database</a>
         <a href="#configuration">Configuration</a>
         <a href="#commands">Commands</a>
@@ -274,11 +275,88 @@ export default function Docs() {
         <p>
           A successful one-off check prints PASS. The daemon records the demo
           every 30 seconds. Open <code>http://127.0.0.1:8080</code> on the
-          machine running the monitor to see its diagnostic status page. Stop
+          machine running the monitor to use the local dashboard. Stop
           foreground processes with Ctrl+C. The next run resumes stored incident
           state and pending notifications. Keep the host awake for continuous
           monitoring.
         </p>
+      </section>
+      <section id="dashboard" className="section-anchor">
+        <h2>Monitor from your browser</h2>
+        <DocRow
+          example={
+            <>
+              <h3>Add an HTTP API</h3>
+              <p>
+                Click <strong>Add API</strong> in the target list. Enter a
+                unique, nonsecret name and the complete HTTP or HTTPS endpoint.
+                Choose GET or HEAD.
+              </p>
+              <p>
+                Set an expected status, or leave it blank to accept any 2xx
+                response. For GET, optionally require exact, case-sensitive
+                response text. Choose an interval of at least five seconds and a
+                timeout shorter than that interval.
+              </p>
+              <p>
+                Click <strong>Save &amp; start monitoring</strong>. The API is
+                saved to your TOML configuration and scheduled immediately.
+                Watch its first real observation appear; it is still monitored
+                after a daemon restart.
+              </p>
+              <p>
+                Saving starts scheduled requests and uses your existing incident
+                thresholds and Telegram settings. Duplicate names and invalid
+                input keep your draft intact. If the dashboard reports that the
+                API saved but could not start, check database access and restart
+                the daemon.
+              </p>
+            </>
+          }
+        >
+          <p>
+            Start the daemon with the loopback listener shown in your OS guide,
+            then{" "}
+            <a
+              href="http://127.0.0.1:8080/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              open the local dashboard
+            </a>{" "}
+            on the same computer. The monitor must be running. This information
+            website and its documentation are separate from your private
+            monitoring data.
+          </p>
+          <h3>See the actual result</h3>
+          <p>
+            Select a target and click <strong>Run check</strong> to send a real
+            check with its saved settings. Read PASS/FAIL, HTTP status, latency,
+            and the failure reason. A 200 response can still fail if required
+            text is missing. Flow checks show each executed step.
+          </p>
+          <p>
+            Manual tests do not change incidents, write scheduled history, or
+            send alerts. Scheduled observations do: DOWN and RECOVERED follow
+            your configured thresholds. A PASS confirms only your configured
+            assertions.
+          </p>
+          <p>
+            Use TOML for authentication headers, POST bodies, multi-step flows,
+            and other target types, then restart after those edits. The form
+            currently adds GET/HEAD checks; target editing and deletion are not
+            yet available.
+          </p>
+          <p>
+            Dashboard links to <strong>Website</strong> and{" "}
+            <strong>Documentation</strong> open in a new tab so an unfinished
+            form stays available. See the{" "}
+            <a href={repository + "/blob/main/docs/dashboard.md"}>
+              complete dashboard guide
+            </a>{" "}
+            for save recovery and access details.
+          </p>
+        </DocRow>
       </section>
       <section id="database" className="section-anchor">
         <h2>The database sets itself up</h2>
@@ -370,8 +448,8 @@ export default function Docs() {
             Use the executable path shown above until the binary is on your
             PATH. Windows uses <code>.\target\release\look-out-api.exe</code>;
             macOS and Linux use <code>./target/release/look-out-api</code>.
-            Restart the daemon after configuration or environment changes; there
-            is no hot reload.
+            Restart after manual TOML or environment changes. APIs added through
+            the dashboard start monitoring immediately.
           </p>
           <p>
             One-off checks return 0 on success, 1 on a failed check, and 2 for

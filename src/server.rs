@@ -89,7 +89,32 @@ async fn home(
         return status(State(state)).await;
     }
     local_dashboard(&state, &headers)?;
-    Ok(Html(include_str!("dashboard/index.html").to_string()))
+    let (site, docs) = information_links(std::env::var("LOOK_OUT_API_SITE_URL").ok().as_deref());
+    Ok(Html(
+        include_str!("dashboard/index.html")
+            .replace("__LOOK_OUT_SITE_URL__", &site)
+            .replace("__LOOK_OUT_DOCS_URL__", &docs),
+    ))
+}
+// This is an optional public information-site location, never a request target or credential.
+fn information_links(configured: Option<&str>) -> (String, String) {
+    const DEFAULT: &str = "https://lawrence1719.github.io/look-out-api/";
+    let valid = configured
+        .and_then(|value| url::Url::parse(value).ok())
+        .filter(|url| {
+            matches!(url.scheme(), "http" | "https")
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.query().is_none()
+                && url.fragment().is_none()
+        });
+    let mut site = valid.unwrap_or_else(|| url::Url::parse(DEFAULT).expect("static site URL"));
+    if !site.path().ends_with('/') {
+        site.set_path(&format!("{}/", site.path()));
+    }
+    let docs = site.join("docs/").expect("relative documentation URL");
+    (escape(site.as_str()), escape(docs.as_str()))
 }
 async fn styles(
     State(state): State<ServerState>,
@@ -287,4 +312,39 @@ fn escape(text: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+#[cfg(test)]
+mod information_link_tests {
+    use super::information_links;
+    #[test]
+    fn information_links_keep_base_paths_and_reject_unsafe_overrides() {
+        assert_eq!(
+            information_links(Some("http://127.0.0.1:3000")),
+            (
+                "http://127.0.0.1:3000/".into(),
+                "http://127.0.0.1:3000/docs/".into()
+            )
+        );
+        assert_eq!(
+            information_links(Some("https://example.invalid/project")),
+            (
+                "https://example.invalid/project/".into(),
+                "https://example.invalid/project/docs/".into()
+            )
+        );
+        for invalid in [
+            "javascript:alert(1)",
+            "file:///private/file",
+            "https://user:secret@example.invalid",
+            "https://example.invalid/?secret=value",
+            "https://example.invalid/#fragment",
+        ] {
+            assert_eq!(information_links(Some(invalid)), information_links(None));
+        }
+        assert!(!information_links(Some("https://example.invalid/a'b"))
+            .0
+            .contains('\''));
+    }
 }
