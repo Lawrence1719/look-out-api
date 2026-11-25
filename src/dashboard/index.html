@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <!-- Bundled Lucide icon license:
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+
+The following Lucide icons are derived from the Feather project:
+
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Look Out API · Local monitor</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+    <script src="/dashboard.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#target-detail">Skip to check details</a>
+    <header class="masthead">
+      <a class="brand" href="/" aria-label="Look Out API local monitor"
+        ><svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="lucide lucide-radio"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M16.247 7.761a6 6 0 0 1 0 8.478"></path>
+          <path d="M19.075 4.933a10 10 0 0 1 0 14.134"></path>
+          <path d="M4.925 19.067a10 10 0 0 1 0-14.134"></path>
+          <path d="M7.753 16.239a6 6 0 0 1 0-8.478"></path>
+          <circle cx="12" cy="12" r="2"></circle></svg
+        ><span>look out<span class="brand-api"> / api</span></span></a
+      >
+      <h1>Local monitor</h1>
+      <div class="connection">
+        <span class="connection-dot" id="connection-dot"></span
+        ><span id="connection-label" role="status">Connecting to daemon…</span
+        ><button
+          class="icon-button"
+          id="refresh"
+          aria-label="Refresh monitoring data"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-refresh-cw"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+            <path d="M21 3v5h-5"></path>
+            <path
+              d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+            ></path>
+            <path d="M8 16H3v5"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+    <div
+      id="connection-error"
+      class="connection-error"
+      role="alert"
+      hidden
+    ></div>
+    <div class="workspace">
+      <aside class="targets-pane" aria-label="Configured targets">
+        <div class="pane-heading">
+          <h2>Targets</h2>
+          <span id="target-count">—</span>
+        </div>
+        <p class="secondary">Your configured checks. Real observations.</p>
+        <nav id="target-list" aria-label="Select a target">
+          <p class="loading">Loading targets…</p>
+        </nav>
+        <div class="local-note">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-shield-check"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+            ></path>
+            <path d="m9 12 2 2 4-4"></path>
+          </svg>
+          <p>Local to this machine.<br />No telemetry. No cloud account.</p>
+        </div>
+      </aside>
+      <main id="target-detail" tabindex="-1">
+        <div id="empty-state" class="empty-state" hidden>
+          <h2>No configured targets</h2>
+          <p>
+            Add a target to your TOML configuration, then restart the daemon.
+            Start with the included local demo API.
+          </p>
+        </div>
+        <div id="loading-detail">
+          <h2>Reading your monitor…</h2>
+          <p>Waiting for the daemon’s first snapshot.</p>
+        </div>
+        <div id="detail-content" hidden>
+          <div class="target-heading">
+            <div>
+              <div class="target-title">
+                <h2 id="target-name"></h2>
+                <span id="target-kind" class="kind"></span>
+              </div>
+              <p id="schedule-summary" class="secondary"></p>
+            </div>
+            <span id="activity" class="activity" role="status"></span>
+          </div>
+          <dl class="status-line">
+            <div>
+              <dt>Incident state</dt>
+              <dd id="incident-state"></dd>
+            </div>
+            <div>
+              <dt>Last scheduled check</dt>
+              <dd id="last-observation"></dd>
+            </div>
+            <div>
+              <dt>Latency</dt>
+              <dd id="last-latency"></dd>
+            </div>
+            <div>
+              <dt>Pending alerts</dt>
+              <dd id="pending-alerts"></dd>
+            </div>
+          </dl>
+          <div class="detail-grid">
+            <section class="manual-section" aria-labelledby="manual-heading">
+              <div class="section-heading">
+                <h3 id="manual-heading">Test this API</h3>
+                <button id="run-check" class="primary-button">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="lucide lucide-play"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path
+                      d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"
+                    ></path></svg
+                  ><span>Run check</span>
+                </button>
+              </div>
+              <p class="secondary">
+                Sends a real check using this target’s saved configuration.
+                Manual tests do not change incidents or send alerts.
+              </p>
+              <div
+                id="action-error"
+                class="action-error"
+                role="alert"
+                hidden
+              ></div>
+              <p id="run-progress" role="status" hidden>
+                Check in progress. Waiting for the API result…
+              </p>
+              <div id="manual-result" class="manual-result">
+                <p class="secondary">
+                  No manual test yet. Run a check to inspect the result here.
+                </p>
+              </div>
+              <dl id="check-rules" class="check-rules"></dl>
+            </section>
+            <section
+              class="observations-section"
+              aria-labelledby="observations-heading"
+            >
+              <div class="section-heading">
+                <h3 id="observations-heading">Scheduled observations</h3>
+                <span id="sample-count" class="secondary"></span>
+              </div>
+              <p class="secondary">
+                Each mark is one completed check, oldest to newest. PASS/FAIL is
+                the observation; incident state follows your thresholds.
+              </p>
+              <ol
+                id="observation-strip"
+                class="observation-strip"
+                aria-label="Recent scheduled check results"
+              ></ol>
+              <p id="threshold-note" class="threshold-note"></p>
+              <div id="scheduled-steps"></div>
+            </section>
+          </div>
+          <section class="history-section" aria-labelledby="history-heading">
+            <div class="section-heading">
+              <h3 id="history-heading">Recent checks</h3>
+              <span class="secondary">Scheduled · latest 24</span>
+            </div>
+            <div
+              class="table-scroll"
+              tabindex="0"
+              role="region"
+              aria-label="Scheduled check history"
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Completed</th>
+                    <th scope="col">Result</th>
+                    <th scope="col">HTTP</th>
+                    <th scope="col">Latency</th>
+                    <th scope="col">Detail</th>
+                  </tr>
+                </thead>
+                <tbody id="history-rows"></tbody>
+              </table>
+            </div>
+          </section>
+          <section
+            class="incidents-section"
+            aria-labelledby="incidents-heading"
+          >
+            <div class="section-heading">
+              <h3 id="incidents-heading">Incidents</h3>
+              <span class="secondary">Latest 5</span>
+            </div>
+            <div id="incidents"></div>
+          </section>
+          <footer>
+            Data comes from your running daemon and local SQLite history. A
+            passing check confirms only the assertions you configured.
+          </footer>
+        </div>
+      </main>
+    </div>
+    <noscript
+      ><p class="connection-error">
+        JavaScript is needed for live results and manual testing. The CLI
+        remains available for status and history.
+      </p></noscript
+    >
+  </body>
+</html>

@@ -15,7 +15,7 @@ pub struct Store {
     pub pool: SqlitePool,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, serde::Serialize, FromRow)]
 pub struct TargetStatus {
     pub name: String,
     pub r#type: String,
@@ -36,7 +36,7 @@ pub struct Notification {
     pub last_error: Option<String>,
     pub permanent_failure: bool,
 }
-#[derive(Debug, FromRow)]
+#[derive(Debug, serde::Serialize, FromRow)]
 pub struct HistoryRow {
     pub checked_at: String,
     pub ok: bool,

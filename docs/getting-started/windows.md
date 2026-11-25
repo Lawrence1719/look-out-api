@@ -59,7 +59,9 @@ Leave it running. Open a second PowerShell window and change to the **same repos
 .\target\release\look-out-api.exe run --bind 127.0.0.1:8080
 ```
 
-`check` should print `PASS` for `local-api`. The daemon then records observations every 30 seconds. Open [the local status page](http://127.0.0.1:8080) to inspect it. This page is separate from the static information website.
+`check` should print `PASS` for `local-api`. The daemon then records observations every 30 seconds. Open [the local dashboard](http://127.0.0.1:8080) to inspect it. This page is separate from the static information website.
+
+Use **Run check** in the dashboard to execute a real manual test and inspect its result. Manual tests do not change incidents or send alerts. See the [dashboard guide](../dashboard.md).
 
 Use a third PowerShell window in the repository directory to inspect history:
 

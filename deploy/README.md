@@ -12,7 +12,7 @@ On a Linux host, build or copy the appropriate binary. Create a system account n
 
 Copy [look-out-api.service](./look-out-api.service) to the host's systemd unit directory, then enable and start that unit. Validate the config as the service user before starting. The service handles SIGTERM and Ctrl+C, finishes in-flight work, and retains its outbox for restart.
 
-No inbound port is required for polling checks. An optional status/heartbeat endpoint is enabled with `LOOK_OUT_API_BIND` or `--bind`; heartbeat targets enable it automatically at `127.0.0.1:8080`. Use an SSH tunnel to reach a loopback-only endpoint. Heartbeats need a configured `LOOK_OUT_API_HEARTBEAT_TOKEN` and a network path to the daemon. Recovery follows the same configured consecutive-success threshold as other targets.
+No inbound port is required for polling checks. An optional dashboard/status/heartbeat endpoint is enabled with `LOOK_OUT_API_BIND` or `--bind`; heartbeat targets enable it automatically at `127.0.0.1:8080`. Use an SSH tunnel to reach a loopback-only endpoint. The [live dashboard and manual test actions](../docs/dashboard.md) are available only on loopback binds; nonloopback binds retain the basic status page and heartbeat endpoint. Heartbeats need a configured `LOOK_OUT_API_HEARTBEAT_TOKEN` and a network path to the daemon. Recovery follows the same configured consecutive-success threshold as other targets.
 
 ## Container demonstration
 

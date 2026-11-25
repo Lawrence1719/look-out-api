@@ -16,6 +16,8 @@ You need Rust and a native build toolchain to build the monitor. Python 3 is use
 
 ## After the first run
 
+- [Local dashboard: watch real checks and run visual API tests](./dashboard.md)
+
 - [Configuration, database, commands, backups, and updates](./usage.md)
 - [Telegram: create a bot, find the chat ID, and verify alerts](./telegram.md)
 - [Troubleshooting](./troubleshooting.md)

@@ -1,21 +1,16 @@
 use crate::{
     alert::{deliver_pending, Telegram},
-    checker::Executor,
     config::{Config, Kind},
+    dashboard::Dashboard,
     server,
     store::Store,
 };
 use std::{
     fs::{File, OpenOptions},
     path::Path,
-    sync::Arc,
     time::Duration,
 };
-use tokio::{
-    sync::{watch, Semaphore},
-    task::JoinSet,
-    time::MissedTickBehavior,
-};
+use tokio::{sync::watch, task::JoinSet, time::MissedTickBehavior};
 
 pub fn lock(path: &Path) -> anyhow::Result<File> {
     let mut options = OpenOptions::new();
@@ -46,11 +41,7 @@ pub async fn run(
     if heartbeat && token.is_none() {
         anyhow::bail!("heartbeat targets require LOOK_OUT_API_HEARTBEAT_TOKEN");
     }
-    let executors = config
-        .targets
-        .iter()
-        .map(|target| Executor::new(target.clone(), config.defaults.clone(), Some(store.clone())))
-        .collect::<anyhow::Result<Vec<_>>>()?;
+    let dashboard = Dashboard::new(&config, store.clone())?;
     let listener = if heartbeat || bind.is_some() {
         let address = bind.unwrap_or_else(|| "127.0.0.1:8080".into());
         let listener = tokio::net::TcpListener::bind(&address)
@@ -65,30 +56,24 @@ pub async fn run(
     store.prune(config.defaults.retention_days).await?;
     let (shutdown, receiver) = watch::channel(false);
     let mut tasks: JoinSet<anyhow::Result<()>> = JoinSet::new();
-    let semaphore = Arc::new(Semaphore::new(16));
-    for executor in executors {
-        let store = store.clone();
-        let defaults = config.defaults.clone();
-        let semaphore = semaphore.clone();
+    for target in &config.targets {
+        let dashboard = dashboard.clone();
+        let name = target.name.clone();
+        let period = target.interval(&config.defaults);
         let mut stop = receiver.clone();
         tasks.spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(executor.target.interval(&defaults)));
+            let mut interval = tokio::time::interval(Duration::from_secs(period));
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
             tokio::select! { _ = tokio::time::sleep(Duration::from_millis(fastrand::u64(0..1000))) => (), _ = stop.changed() => return Ok(()) }
             loop {
                 tokio::select! {
                     _ = stop.changed() => break,
                     _ = interval.tick() => {
-                        let permit = tokio::select! {
-                            permit = semaphore.acquire() => permit?,
+                        tokio::select! {
                             _ = stop.changed() => break,
-                        };
-                        let result = executor.check().await;
-                        drop(permit);
-                        let transition = store.record(&executor.target.name,&result,executor.target.failure(&defaults),executor.target.recovery(&defaults)).await?;
-                        tracing::info!(target_name=%executor.target.name,ok=result.ok,latency_ms=result.latency_ms,"check completed");
-                        if let Some(transition) = transition { tracing::info!(target_name=%executor.target.name,transition=transition.as_str(),"incident transition queued"); }
-                    }
+                            result = dashboard.scheduled(&name) => result?,
+                        }
+                    },
                 }
             }
             Ok(())
@@ -126,7 +111,8 @@ pub async fn run(
         });
     }
     if let Some(listener) = listener {
-        let app = server::router(store.clone(), token);
+        let local = listener.local_addr()?.ip().is_loopback();
+        let app = server::dashboard_router(store.clone(), token, local.then_some(dashboard));
         let mut stop = receiver.clone();
         tasks.spawn(async move {
             axum::serve(listener, app)

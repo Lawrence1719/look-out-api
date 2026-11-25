@@ -126,3 +126,28 @@ Local preview restoration exposed generated Next.js type references changing bet
 - Website formatting, type generation/typecheck, and static export passed. All six browser tests passed, including automated accessibility checks. The initial accessibility run identified scrollable examples without keyboard access; focusable code regions fixed the issue before the passing rerun.
 - Measured the static export at 320, 375, 768, 1024, 1440, and 1920px with fonts loaded: no horizontal page overflow. Visually reviewed desktop, intermediate, mobile, and OS-anchor views. Verified Windows command copying preserves the complete text and keyboard focus reaches its scrolling code region. The scoped Impeccable layout scan reported no findings.
 - This change affects the information site only; local monitoring credentials and runtime data were not changed.
+
+## Local dashboard and visual testing
+
+2026-11-26 · Agent: codex · Branch: `feat/local-dashboard` · [Design](./specs/2026-11-25-local-dashboard-design.md) · [Plan](./plans/2026-11-25-local-dashboard.md) · [Surface record](./surfaces/local-dashboard.md).
+
+| Rule / decision | Status | Evidence |
+| --- | --- | --- |
+| Manual tests perform real configured checks | Verified locally | `manual_checks_make_real_requests_without_changing_incidents_or_history`; browser request counter, actual HTTP 200 PASS and response-text mismatch FAIL |
+| Manual tests do not advance scheduled history/incidents/outbox | Verified locally | Same Rust test compares stored state and check/incident/notification counts; isolated release-daemon smoke preserved history count and created zero notifications |
+| Manual and scheduled execution share per-target serialization | Verified locally | `execution_is_serialized_and_scheduled_results_remain_durable_and_safe`; overlapping manual requests rejected, scheduled request waits and persists |
+| Real flow-step and timeout results; stale observations remain unknown | Verified locally | `dashboard_exposes_real_flow_steps_timeouts_and_stale_state`; browser flow and timeout checks |
+| Dashboard excludes private request details | Verified locally | Snapshot assertions exclude mock URL/query, header, expected response text, and extracted flow values; browser uses text nodes for safe rendering |
+| Dashboard actions require local Host, same Origin, and custom header | Verified locally | `dashboard_api_checks_origin_host_and_configured_target_boundary`; unknown configured target rejected |
+| Nonloopback daemon listeners disable dashboard data/actions | Built and locally checked | Scheduler enables dashboard runtime only for loopback listener addresses; `dashboard_actions_are_unavailable_without_loopback_runtime` proves disabled routing. Existing heartbeat integration still passes |
+| Scheduled transactions, incidents, and outbox behavior remain intact | Verified locally | Existing persistence tests; browser observes actual local mock DOWN after failure threshold and RECOVERED after success threshold |
+| Responsive UI, connection failure, empty state, focus and detectable accessibility | Verified locally | Dashboard browser suite, 320–1920px overflow measurements, desktop/mobile captures, reduced-motion mode; automated accessibility is not a full human audit |
+| Embedded assets need no Node runtime or CDN | Verified locally | Release-binary smoke serves page and bundled fonts from the daemon; fonts and icon license notices retained |
+
+Final local gates: Rust fmt, Clippy with warnings denied, and **28 tests passed** in an isolated source checkout with the owner's credentials absent. Website clean install, formatting (including embedded dashboard assets), type generation/typecheck, static export, and **6 existing browser/accessibility tests passed**. The separate real-daemon dashboard browser suite has **3 passing tests**. `actionlint` passed after adding dashboard browser coverage to CI. Relative documentation links were checked.
+
+Visual QA used real local mock executions: PASS, HTTP 200 with a failed text assertion, running feedback, and completed flow steps. The Impeccable reviewer initially requested truthful immediate activity text and the established Manrope/DM Sans pairing; its verdict pass scored both fixes resolved, disposition **ship** at that scope. A later check of the owner's 24-observation history exposed the state machine's saturated counters; copy now explicitly calls them capped threshold counters rather than a full success streak. Review screenshots are transient local QA and are not committed.
+
+An isolated release-daemon run against the included local demo verified dashboard routing, a real manual HTTP 200 PASS, unchanged scheduled history, zero notifications created by the manual action, bundled font delivery, and clean SIGTERM shutdown. The owner's local monitor was restarted with the new binary, preserving its existing private config/database and healthy demo. The dashboard was opened at `http://127.0.0.1:8080/`; clicking Run check returned a real PASS. No automated test used the owner's Telegram credentials or private database, and no new Telegram delivery test was run for this feature.
+
+Still needs people: Lawrence reviews/merges the feature PR and its documentation dependency. Tagged release packaging, container execution, an always-on host, remote administration/authentication, native Windows/Linux dashboard walkthroughs, and broader assistive-technology checks remain separate work. The public information site remains independently static; planned protocols and expanded assertions remain on the full roadmap.
