@@ -1,0 +1,32 @@
+[defaults]
+interval_secs = 60
+timeout_secs = 10
+failure_threshold = 3
+recovery_threshold = 2
+retention_days = 30
+
+# Start with: python3 examples/demo_api.py
+[[target]]
+name = "local-api"
+url = "http://127.0.0.1:3001/health"
+expected_status = 200
+expected_body_contains = "ok"
+interval_secs = 30
+
+# Optional examples — uncomment and adjust before running.
+# [[target]]
+# name = "database-port"
+# type = "tcp"
+# host = "127.0.0.1"
+# port = 5432
+
+# [[target]]
+# name = "app-dns"
+# type = "dns"
+# host = "example.com"
+
+# [[target]]
+# name = "nightly-backup"
+# type = "heartbeat"
+# grace_secs = 90000
+# Requires LOOK_OUT_API_HEARTBEAT_TOKEN and a reachable daemon endpoint.

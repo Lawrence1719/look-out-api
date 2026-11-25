@@ -1,0 +1,26 @@
+services:
+  monitor:
+    build:
+      context: ..
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./compose.example.toml:/etc/look-out-api/look-out-api.toml:ro
+      - monitor-data:/var/lib/look-out-api
+    networks:
+      - private
+      - default
+  demo-api:
+    image: python:3.13-slim
+    command: [python, /demo/demo_api.py, --bind, 0.0.0.0]
+    volumes:
+      - ../examples/demo_api.py:/demo/demo_api.py:ro
+    networks:
+      - private
+networks:
+  private:
+    internal: true
+volumes:
+  monitor-data:

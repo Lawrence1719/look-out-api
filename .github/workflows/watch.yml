@@ -1,0 +1,69 @@
+name: Second watcher
+on:
+  schedule:
+    - cron: "*/7 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: second-watcher
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check watcher configuration
+        id: configured
+        env:
+          CONFIG_B64: ${{ secrets.LOOK_OUT_API_CONFIG_B64 }}
+        run: |
+          if [ -n "$CONFIG_B64" ]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Second watcher is not configured; set LOOK_OUT_API_CONFIG_B64 to enable it.'
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.configured.outputs.enabled == 'true'
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        if: steps.configured.outputs.enabled == 'true'
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        if: steps.configured.outputs.enabled == 'true'
+      - run: cargo build --release --locked
+        if: steps.configured.outputs.enabled == 'true'
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.configured.outputs.enabled == 'true'
+        with:
+          path: state.json
+          key: watch-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: watch-state-
+      - name: Write private config
+        if: steps.configured.outputs.enabled == 'true'
+        env:
+          CONFIG_B64: ${{ secrets.LOOK_OUT_API_CONFIG_B64 }}
+        run: |
+          python - <<'PY'
+          import base64, os, pathlib
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'look-out-api.toml'
+          data = base64.b64decode(os.environ['CONFIG_B64'], validate=True)
+          fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+          with os.fdopen(fd, 'wb') as output:
+              output.write(data)
+          PY
+      - name: Run checks and advance alert state
+        id: checks
+        if: steps.configured.outputs.enabled == 'true'
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: ./target/release/look-out-api --config "$RUNNER_TEMP/look-out-api.toml" --quiet check --state-file state.json --alert
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.configured.outputs.enabled == 'true' && hashFiles('state.json') != ''
+        with:
+          path: state.json
+          key: watch-state-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Preserve unsuccessful check exit status
+        if: always() && steps.checks.outcome == 'failure'
+        run: exit 1
