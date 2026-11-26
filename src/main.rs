@@ -154,7 +154,9 @@ async fn execute(cli: Cli) -> anyhow::Result<bool> {
                         (chrono::Utc::now() - time.with_timezone(&chrono::Utc)).num_seconds()
                             > target.interval_secs * 2
                     });
-                let label = if stale {
+                let label = if target.paused {
+                    "paused"
+                } else if stale {
                     "unknown/stale"
                 } else {
                     &target.status

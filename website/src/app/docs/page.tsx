@@ -341,6 +341,19 @@ export default function Docs() {
             your configured thresholds. A PASS confirms only your configured
             assertions.
           </p>
+          <h3>Pause a target</h3>
+          <p>
+            Select a target and click <strong>Pause monitoring</strong>. An
+            active check finishes before pause is confirmed. Scheduled checks
+            then stop, while configuration, history, incidents, and counters
+            stay intact. Other targets keep running.
+          </p>
+          <p>
+            Manual tests remain available, and already queued alerts may still
+            be delivered. Click <strong>Resume monitoring</strong> to continue
+            on the saved schedule. Pauses survive a restart with the same local
+            database.
+          </p>
           <p>
             Use TOML for authentication headers, POST bodies, multi-step flows,
             and other target types, then restart after those edits. The form

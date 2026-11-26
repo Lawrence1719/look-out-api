@@ -1,5 +1,5 @@
 use crate::{
-    dashboard::{Dashboard, RunError},
+    dashboard::{ControlError, Dashboard, RunError},
     registration::{AddError, NewApi},
     store::Store,
 };
@@ -37,6 +37,8 @@ pub fn dashboard_router(
         .route("/api/dashboard", get(snapshot))
         .route("/api/targets", post(add_api).layer(DefaultBodyLimit::max(16 * 1024)))
         .route("/api/targets/{name}/check", post(run_check))
+        .route("/api/targets/{name}/pause", post(pause_target))
+        .route("/api/targets/{name}/resume", post(resume_target))
         .route("/healthz", get(|| async { "ok" }))
         .route("/heartbeat/{name}", post(heartbeat))
         .layer(middleware::map_response(security_headers))
@@ -266,6 +268,54 @@ async fn run_check(
             .into_response(),
     }
 }
+async fn pause_target(
+    State(state): State<ServerState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    change_monitoring(state, name, headers, true).await
+}
+async fn resume_target(
+    State(state): State<ServerState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    change_monitoring(state, name, headers, false).await
+}
+async fn change_monitoring(
+    state: ServerState,
+    name: String,
+    headers: HeaderMap,
+    paused: bool,
+) -> Response {
+    let dashboard = match local_dashboard(&state, &headers) {
+        Ok(dashboard) => dashboard.clone(),
+        Err(code) => return code.into_response(),
+    };
+    if require_action(
+        &headers,
+        if paused {
+            "pause-target"
+        } else {
+            "resume-target"
+        },
+    )
+    .is_err()
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error":"Use the local dashboard to change monitoring."})),
+        )
+            .into_response();
+    }
+    // Finish an admitted state change even if the client stops waiting.
+    match tokio::spawn(async move { dashboard.set_paused(&name, paused).await }).await {
+        Ok(Ok(change)) => Json(change).into_response(),
+        Ok(Err(ControlError::Missing)) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"Target is not configured."}))).into_response(),
+        Ok(Err(ControlError::Storage)) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"Monitoring could not be changed. Check database access and refresh before retrying."}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"The monitoring change is uncertain. Refresh before retrying."}))).into_response(),
+    }
+}
 async fn heartbeat(
     State(state): State<ServerState>,
     Path(name): Path<String>,
@@ -304,7 +354,9 @@ async fn status(State(state): State<ServerState>) -> Result<Html<String>, Status
                 (chrono::Utc::now() - time.with_timezone(&chrono::Utc)).num_seconds()
                     > target.interval_secs * 2
             });
-        let label = if stale {
+        let label = if target.paused {
+            "paused"
+        } else if stale {
             "unknown / stale"
         } else {
             &target.status

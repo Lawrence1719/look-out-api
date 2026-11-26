@@ -3,6 +3,21 @@ import AxeBuilder from "@axe-core/playwright";
 
 test.beforeEach(async ({ request }) => {
   await request.post("http://127.0.0.1:4182/control/up");
+  const snapshot = await (
+    await request.get("http://127.0.0.1:4181/api/dashboard")
+  ).json();
+  for (const target of snapshot.targets) {
+    if (target.paused)
+      await request.post(
+        `http://127.0.0.1:4181/api/targets/${encodeURIComponent(target.name)}/resume`,
+        {
+          headers: {
+            Origin: "http://127.0.0.1:4181",
+            "X-Look-Out-Action": "resume-target",
+          },
+        },
+      );
+  }
 });
 
 async function selectDemo(page: import("@playwright/test").Page) {
@@ -17,6 +32,22 @@ test("dashboard manual checks reach the real API and show assertion failures", a
   page,
   request,
 }) => {
+  // Isolate explicit manual requests from background scheduler contention.
+  const snapshot = await (
+    await request.get("http://127.0.0.1:4181/api/dashboard")
+  ).json();
+  for (const target of snapshot.targets) {
+    const response = await request.post(
+      `http://127.0.0.1:4181/api/targets/${encodeURIComponent(target.name)}/pause`,
+      {
+        headers: {
+          Origin: "http://127.0.0.1:4181",
+          "X-Look-Out-Action": "pause-target",
+        },
+      },
+    );
+    expect(response.status()).toBe(200);
+  }
   await selectDemo(page);
   const run = page.getByRole("button", { name: "Run check", exact: true });
   await expect(run).toBeEnabled();
@@ -383,4 +414,109 @@ test("shared dropdown handles required values, disabled options and multiple con
   await page.reload();
   await page.getByRole("button", { name: "Add API", exact: true }).click();
   await expect(page.locator("#api-method")).toBeVisible();
+});
+
+test("target monitoring pauses without new observations and resumes on its schedule", async ({
+  page,
+  request,
+}) => {
+  await selectDemo(page);
+  await expect(page.locator("#history-rows")).toContainText("200", {
+    timeout: 8000,
+  });
+  const pause = page.getByRole("button", {
+    name: "Pause monitoring",
+    exact: true,
+  });
+  await pause.click();
+  const resume = page.getByRole("button", {
+    name: "Resume monitoring",
+    exact: true,
+  });
+  await expect(resume).toBeEnabled();
+  await expect(resume.locator("#monitor-resume-icon")).toBeVisible();
+  await expect(resume.locator("#monitor-pause-icon")).toBeHidden();
+  await expect(page.locator("#monitoring-note")).toContainText(
+    "Monitoring paused",
+  );
+  await expect(page.locator("#target-list")).toContainText("PAUSED");
+  await expect(resume).toBeFocused();
+  const history = (
+    await (await request.get("/api/dashboard")).json()
+  ).targets.find(
+    (target: { name: string }) => target.name === "demo-api",
+  ).history;
+  await page.waitForTimeout(5600);
+  const paused = (
+    await (await request.get("/api/dashboard")).json()
+  ).targets.find((target: { name: string }) => target.name === "demo-api");
+  expect(paused.paused).toBe(true);
+  expect(paused.history).toEqual(history);
+  await page.getByRole("button", { name: "Run check", exact: true }).click();
+  await expect(page.locator("#manual-result")).toContainText("PASS");
+  await expect(resume).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: /demo-api/ }).click();
+  await expect(resume).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.route("**/api/targets/demo-api/resume", (route) =>
+    route.fulfill({ status: 500, json: { error: "simulated local failure" } }),
+  );
+  await resume.click();
+  await expect(page.locator("#monitoring-error")).toContainText(
+    "could not be changed",
+  );
+  await expect(resume).toBeEnabled();
+  await page.unroute("**/api/targets/demo-api/resume");
+  await resume.click();
+  await expect(pause).toBeEnabled();
+  await expect
+    .poll(
+      async () => {
+        const target = (
+          await (await request.get("/api/dashboard")).json()
+        ).targets.find((item: { name: string }) => item.name === "demo-api");
+        return target.history[0].checked_at;
+      },
+      { timeout: 8000 },
+    )
+    .not.toBe(history[0].checked_at);
+
+  // Model a durable pause before the first scheduled observation.
+  const emptySnapshot = await (await request.get("/api/dashboard")).json();
+  const emptyTarget = emptySnapshot.targets.find(
+    (target: { name: string }) => target.name === "demo-api",
+  );
+  emptyTarget.history = [];
+  emptyTarget.paused = true;
+  await page.route("**/api/dashboard", (route) =>
+    route.fulfill({ json: emptySnapshot }),
+  );
+  await page.getByRole("button", { name: "Refresh monitoring data" }).click();
+  await expect(page.locator("#threshold-note")).toContainText(
+    "Scheduled checks begin after monitoring resumes",
+  );
+  await expect(page.locator("#history-rows")).toContainText(
+    "Resume to record scheduled observations",
+  );
+  emptyTarget.paused = false;
+  await page.getByRole("button", { name: "Refresh monitoring data" }).click();
+  await expect(page.locator("#threshold-note")).toContainText(
+    "The first check runs shortly after the daemon starts",
+  );
+  await expect(page.locator("#history-rows")).toContainText(
+    "Waiting for the first scheduled check",
+  );
 });

@@ -52,6 +52,14 @@ A single failed observation can appear while incident state is still UP: an inci
 
 To verify a DOWN/RECOVERED transition safely, use only the included local demo. Leave the monitor running, stop the demo, wait for the failure threshold, restart the demo, and wait for recovery. Scheduled transitions can send Telegram alerts when delivery is configured. The manual **Run check** action does not replace this incident test.
 
+## Pause or resume a target
+
+Select a target and click **Pause monitoring**. An active check finishes before pause is acknowledged; the button shows progress while waiting. Once the target is marked **PAUSED**, its scheduled checks stop. Other targets keep running.
+
+The target stays configured. History, incidents, threshold counters, and pending notifications are preserved. Manual dashboard tests and explicit one-off CLI checks remain available. Already queued alerts may still be delivered; pause does not clear or mute the notification queue. Open incidents remain as recorded until actual resumed observations reach the recovery threshold.
+
+Click **Resume monitoring** to continue on the saved schedule. Use **Run check** if you want an immediate manual result. Pause state is saved in SQLite and survives restart when using the same database; it is not written into TOML. The CLI `status` command also labels paused targets. If a connection drops while changing monitoring, refresh and inspect the state before trying again. Pausing is separate from deleting a target; dashboard deletion is not yet available.
+
 ## Access boundary and troubleshooting
 
 The dashboard and its action/data endpoints are enabled only when the daemon binds to a loopback IP. Use `127.0.0.1:8080` (or `[::1]:8080`) and visit that address directly. Host checks and same-origin action headers reject foreign browser requests; the dashboard does not enable cross-origin access. A nonloopback bind keeps the basic read-only status page and heartbeat endpoint but disables the dashboard APIs. Remote dashboard administration and authentication are not implemented.

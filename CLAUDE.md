@@ -19,3 +19,5 @@
 - Follow AGENTS.md for persistence, secret handling, and external-input rules.
 
 - Dashboard single-select controls use shared `src/dashboard/dropdown.js` enhancement and dashboard CSS; retain native form backing, labels, keyboard navigation, disabled/reset semantics, and viewport-safe menus.
+
+- Per-target pause/resume is durable in SQLite targets.paused (migration 0002). Dashboard control actions share the execution gate; scheduled ticks skip paused targets. Manual tests and already queued delivery continue; resume uses the existing schedule.

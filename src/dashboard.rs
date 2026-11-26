@@ -94,6 +94,17 @@ pub enum RunError {
     Missing,
     Busy,
 }
+#[derive(Debug)]
+pub enum ControlError {
+    Missing,
+    Storage,
+}
+#[derive(Serialize)]
+pub struct MonitoringChange {
+    pub name: String,
+    pub paused: bool,
+    pub message: &'static str,
+}
 struct ActivityGuard<'a>(&'a watch::Sender<Option<Activity>>);
 impl Drop for ActivityGuard<'_> {
     fn drop(&mut self) {
@@ -192,6 +203,38 @@ impl Dashboard {
             },
         })
     }
+    pub async fn set_paused(
+        &self,
+        name: &str,
+        paused: bool,
+    ) -> Result<MonitoringChange, ControlError> {
+        let runner = self
+            .targets
+            .read()
+            .await
+            .get(name)
+            .cloned()
+            .ok_or(ControlError::Missing)?;
+        // Drain an admitted execution before acknowledging pause. No transaction spans the check.
+        let _gate = runner.gate.lock().await;
+        if !self
+            .store
+            .set_paused(name, paused)
+            .await
+            .map_err(|_| ControlError::Storage)?
+        {
+            return Err(ControlError::Missing);
+        }
+        Ok(MonitoringChange {
+            name: name.to_owned(),
+            paused,
+            message: if paused {
+                "Monitoring paused. Scheduled checks are stopped."
+            } else {
+                "Monitoring resumed. Checks follow the saved schedule."
+            },
+        })
+    }
     pub async fn manual(&self, name: &str) -> Result<CheckResult, RunError> {
         let runner = self
             .targets
@@ -217,6 +260,9 @@ impl Dashboard {
             .ok_or_else(|| anyhow::anyhow!("target is not configured"))?;
         let _gate = runner.gate.lock().await;
         let _permit = self.capacity.acquire().await?;
+        if self.store.paused(name).await? {
+            return Ok(());
+        }
         let _activity = runner.start("scheduled");
         let result = runner.executor.check().await;
         let transition = self
@@ -237,7 +283,7 @@ impl Dashboard {
     pub async fn snapshot(&self) -> anyhow::Result<Snapshot> {
         let runners = self.targets.read().await.clone();
         let mut tx = self.store.pool.begin().await?;
-        let states: Vec<TargetStatus> = sqlx::query_as("SELECT t.name,t.type,t.interval_secs,s.status,s.last_checked_at,s.consecutive_fail,s.consecutive_ok FROM targets t JOIN target_state s ON s.target_id=t.id WHERE t.active=1 ORDER BY t.name").fetch_all(&mut *tx).await?;
+        let states: Vec<TargetStatus> = sqlx::query_as("SELECT t.name,t.type,t.interval_secs,t.paused,s.status,s.last_checked_at,s.consecutive_fail,s.consecutive_ok FROM targets t JOIN target_state s ON s.target_id=t.id WHERE t.active=1 ORDER BY t.name").fetch_all(&mut *tx).await?;
         let now = Utc::now();
         let mut targets = Vec::new();
         for state in states {

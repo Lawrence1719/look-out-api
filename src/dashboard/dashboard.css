@@ -988,3 +988,26 @@ select:disabled {
   color: var(--danger);
   font-size: 13px;
 }
+
+.target-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.target-controls .secondary-button {
+  flex-shrink: 0;
+}
+.monitoring-note {
+  margin-top: 14px;
+  max-width: 75ch;
+}
+.paused {
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .target-controls {
+    justify-content: flex-start;
+  }
+}

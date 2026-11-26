@@ -13,6 +13,8 @@
   let targetKey = "";
   const pending = new Set();
   const actionErrors = new Map();
+  const monitoringPending = new Map();
+  const monitoringErrors = new Map();
   const date = (value) =>
     value
       ? new Date(value).toLocaleString(undefined, {
@@ -77,8 +79,12 @@
       button.setAttribute("aria-current", String(target.name === selected));
       const meta = button.querySelector(".target-meta");
       meta.children[0].textContent = target.type.toUpperCase();
-      meta.children[1].textContent = statusLabel(target);
-      meta.children[1].className = stateClass(target);
+      meta.children[1].textContent = target.paused
+        ? "PAUSED"
+        : statusLabel(target);
+      meta.children[1].className = target.paused
+        ? "paused"
+        : stateClass(target);
     });
     byId("target-count").textContent = String(names.length);
   }
@@ -198,7 +204,9 @@
     replace("observation-strip", ...marks);
     byId("threshold-note").textContent = history.length
       ? `${target.failure_threshold} consecutive failures to open an incident; ${target.recovery_threshold} successes to recover. Threshold counters (capped): failures ${target.consecutive_fail}/${target.failure_threshold}; successes ${target.consecutive_ok}/${target.recovery_threshold}. History shows samples, not continuous uptime.`
-      : "No scheduled observations yet. The first check runs shortly after the daemon starts.";
+      : target.paused
+        ? "No scheduled observations yet. Scheduled checks begin after monitoring resumes."
+        : "No scheduled observations yet. The first check runs shortly after the daemon starts.";
     replace(
       "scheduled-steps",
       ...(target.steps.length
@@ -229,7 +237,9 @@
       const row = element("tr");
       const cell = element(
         "td",
-        "Waiting for the first scheduled check.",
+        target.paused
+          ? "Monitoring paused. Resume to record scheduled observations."
+          : "Waiting for the first scheduled check.",
         "secondary",
       );
       cell.colSpan = 5;
@@ -306,7 +316,32 @@
     const target = snapshot.targets.find((target) => target.name === selected);
     if (!target) return;
     const busy = pending.has(target.name) || Boolean(target.activity);
-    byId("run-check").disabled = !connected || busy;
+    const changing = monitoringPending.has(target.name);
+    const control = byId("monitor-toggle");
+    control.disabled = !connected || changing;
+    control.setAttribute("aria-busy", String(changing));
+    control.querySelector("span").textContent = changing
+      ? monitoringPending.get(target.name)
+        ? "Pausing…"
+        : "Resuming…"
+      : target.paused
+        ? "Resume monitoring"
+        : "Pause monitoring";
+    byId("monitor-pause-icon").toggleAttribute(
+      "hidden",
+      Boolean(target.paused),
+    );
+    byId("monitor-resume-icon").toggleAttribute("hidden", !target.paused);
+    byId("monitoring-note").hidden = !target.paused && !changing;
+    byId("monitoring-note").textContent = changing
+      ? monitoringPending.get(target.name)
+        ? "Pausing monitoring. An active check will finish before scheduled checks stop."
+        : "Resuming monitoring on the saved schedule…"
+      : "Monitoring paused. Manual tests remain available. Already queued alerts may still be delivered.";
+    const monitoringError = monitoringErrors.get(target.name);
+    byId("monitoring-error").hidden = !monitoringError;
+    byId("monitoring-error").textContent = monitoringError || "";
+    byId("run-check").disabled = !connected || busy || changing;
     byId("run-check").classList.toggle("running", busy);
     byId("run-check").querySelector("span").textContent = busy
       ? "Checking…"
@@ -316,7 +351,9 @@
       ? "Manual check running"
       : target.activity
         ? `${target.activity.source === "manual" ? "Manual" : "Scheduled"} check running`
-        : "Waiting for next scheduled check";
+        : target.paused
+          ? "Monitoring paused"
+          : "Waiting for next scheduled check";
     byId("activity").classList.toggle("running", busy);
     if (!connected) byId("activity").textContent = "Live activity unavailable";
     const error = actionErrors.get(target.name);
@@ -329,7 +366,7 @@
     byId("target-name").textContent = target.name;
     byId("target-kind").textContent = target.type;
     byId("schedule-summary").textContent =
-      `Scheduled every ${target.interval_secs}s · last observed ${date(target.last_checked_at)}`;
+      `${target.paused ? "Monitoring paused" : `Scheduled every ${target.interval_secs}s`} · last observed ${date(target.last_checked_at)}`;
     replace("incident-state", badge(statusLabel(target), stateClass(target)));
     const latest = target.history[0];
     replace(
@@ -496,6 +533,56 @@
         if (window.LookOutDropdowns) window.LookOutDropdowns.focus(invalid);
         else invalid.focus();
       }
+    }
+  });
+
+  byId("monitor-toggle").addEventListener("click", async () => {
+    const target = snapshot?.targets.find((item) => item.name === selected);
+    if (!target || !connected || monitoringPending.has(target.name)) return;
+    const name = target.name;
+    const paused = !target.paused;
+    const action = paused ? "pause" : "resume";
+    monitoringPending.set(name, paused);
+    monitoringErrors.delete(name);
+    render();
+    try {
+      const response = await fetch(
+        `/api/targets/${encodeURIComponent(name)}/${action}`,
+        {
+          method: "POST",
+          headers: { "X-Look-Out-Action": `${action}-target` },
+          signal: AbortSignal.timeout((target.timeout_secs + 15) * 1000),
+        },
+      );
+      if (!response.ok) {
+        monitoringErrors.set(
+          name,
+          response.status === 404
+            ? "This target is no longer configured. Refresh the dashboard."
+            : "Monitoring could not be changed. Refresh to check its state before retrying.",
+        );
+        return;
+      }
+      const result = await response.json();
+      if (refreshPromise) await refreshPromise;
+      await refresh(true);
+      const current = snapshot?.targets.find((item) => item.name === name);
+      if (current) current.paused = result.paused;
+    } catch {
+      monitoringErrors.set(
+        name,
+        "The monitoring change is uncertain. Reconnect and refresh to check its state before retrying.",
+      );
+    } finally {
+      monitoringPending.delete(name);
+      detailKey = "";
+      render();
+      if (
+        !formOpen &&
+        selected === name &&
+        [document.body, byId("monitor-toggle")].includes(document.activeElement)
+      )
+        byId("monitor-toggle").focus();
     }
   });
 
