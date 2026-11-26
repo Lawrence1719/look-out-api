@@ -868,3 +868,123 @@ select:disabled {
     margin-bottom: 0;
   }
 }
+
+/* Shared dropdown: native values, custom visible control and viewport-safe menu. */
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #959d8c;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+}
+.dropdown-trigger:hover:enabled {
+  border-color: var(--muted);
+  background: var(--surface);
+}
+.dropdown-trigger[aria-expanded="true"],
+.dropdown-trigger[aria-invalid="true"] {
+  border-color: var(--signal);
+}
+.dropdown-trigger:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+.dropdown-trigger:disabled {
+  opacity: 1;
+  background: var(--surface);
+  color: var(--muted);
+}
+.dropdown-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dropdown-trigger > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 150ms ease-out;
+}
+.dropdown-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+.dropdown-options {
+  position: fixed;
+  z-index: 100;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid #959d8c;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.dropdown-option > span {
+  min-width: 0;
+}
+.dropdown-option > svg {
+  flex-shrink: 0;
+  visibility: hidden;
+}
+.dropdown-option[aria-selected="true"] {
+  font-weight: 600;
+}
+.dropdown-option[aria-selected="true"] > svg {
+  visibility: visible;
+  color: var(--signal);
+}
+.dropdown-option.is-active {
+  background: var(--surface);
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+}
+.dropdown-option[aria-disabled="true"] {
+  color: var(--muted);
+  cursor: default;
+}
+@media (max-width: 700px) {
+  .dropdown-trigger,
+  .dropdown-options {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-trigger > svg {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .dropdown-trigger,
+  .dropdown-options {
+    border-color: ButtonText;
+  }
+  .dropdown-option.is-active {
+    outline-color: Highlight;
+  }
+  .dropdown-option[aria-selected="true"] > svg {
+    color: ButtonText;
+  }
+}
+
+.dropdown-error {
+  color: var(--danger);
+  font-size: 13px;
+}

@@ -32,6 +32,7 @@ pub fn dashboard_router(
         .route("/dashboard.css", get(styles))
         .route("/status.css", get(|| async { ([("content-type", "text/css")], "body{font:16px system-ui;background:#f7f7f2;color:#232721;margin:3rem auto;padding:0 1rem;max-width:60rem}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:1rem;border-bottom:1px solid #ccd0c5}") }))
         .route("/dashboard.js", get(script))
+        .route("/dropdown.js", get(dropdown_script))
         .route("/fonts/{name}", get(font_asset))
         .route("/api/dashboard", get(snapshot))
         .route("/api/targets", post(add_api).layer(DefaultBodyLimit::max(16 * 1024)))
@@ -134,6 +135,16 @@ async fn script(
     Ok((
         [("content-type", "text/javascript; charset=utf-8")],
         include_str!("dashboard/dashboard.js"),
+    ))
+}
+async fn dropdown_script(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, StatusCode> {
+    local_dashboard(&state, &headers)?;
+    Ok((
+        [("content-type", "text/javascript; charset=utf-8")],
+        include_str!("dashboard/dropdown.js"),
     ))
 }
 async fn font_asset(

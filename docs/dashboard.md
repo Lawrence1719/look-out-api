@@ -36,6 +36,8 @@ Manual tests do **not** write scheduled history, change incident counters, or se
 
 Saving starts scheduled requests and uses your existing incident thresholds and alert settings. A failing endpoint can still be saved and monitored. Nothing is requested just by filling out the form. Keep URLs and expected text private; they are stored locally in your configuration, but excluded from dashboard snapshots and logs. Environment placeholders and embedded URL credentials are not accepted in this form.
 
+Dropdowns support arrow keys, Home/End, and typing an option name. Enter or Space confirms, Tab confirms and moves on, and Escape closes without changing the selection.
+
 Existing comments, secret placeholders, file permissions, and target state are preserved. Saves use an atomic file replacement and a sibling write lock. Avoid editing the configuration in another editor while adding APIs: if a changed file is detected, the save is rejected and you must restart the monitor to load that configuration. Symlinked, read-only, missing, or oversized configuration disables additions. Duplicate names, including names retained in local history, are rejected.
 
 If a file saves but database registration fails, the dashboard explicitly says that a restart is needed. Check database access and restart; startup loads the saved API. If the connection drops during a save, refresh and check the target list before retrying. The form keeps your draft when a save fails.

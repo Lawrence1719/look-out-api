@@ -17,3 +17,5 @@
 - Roadmap: spec.md. Design and current verification: docs/design/.
 - No production host or live Telegram credentials are configured. Static site publishing is prepared for GitHub Pages after reviewed merge.
 - Follow AGENTS.md for persistence, secret handling, and external-input rules.
+
+- Dashboard single-select controls use shared `src/dashboard/dropdown.js` enhancement and dashboard CSS; retain native form backing, labels, keyboard navigation, disabled/reset semantics, and viewport-safe menus.

@@ -204,3 +204,183 @@ test("add API validates a draft and starts real scheduled monitoring without res
     page.getByRole("button", { name: "Add API", exact: true }),
   ).toBeFocused();
 });
+
+test("custom dropdown supports keyboard, pointer, reset, mobile, and real HEAD monitoring", async ({
+  page,
+}) => {
+  await selectDemo(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "Add API", exact: true }).click();
+  const method = page.getByRole("combobox", { name: "Method", exact: true });
+  const options = page.getByRole("listbox", { name: "Method", exact: true });
+  await expect(method).toHaveText("GET");
+  await method.focus();
+  await method.press("ArrowDown");
+  await expect(options).toBeVisible();
+  await method.press("End");
+  await method.press("Enter");
+  await expect(method).toHaveText("HEAD");
+  await expect(
+    page.getByLabel("Response contains", { exact: false }),
+  ).toBeDisabled();
+  await method.press("ArrowUp");
+  await method.press("Home");
+  await method.press("Escape");
+  await expect(method).toHaveText("HEAD");
+  await expect(method).toBeFocused();
+  await method.click();
+  await options.getByRole("option", { name: "GET", exact: true }).click();
+  await expect(method).toHaveText("GET");
+  await expect(
+    page.getByLabel("Response contains", { exact: false }),
+  ).toBeEnabled();
+  await method.press("h");
+  await method.press("Tab");
+  await expect(method).toHaveText("HEAD");
+  await expect(
+    page.getByLabel("Expected status", { exact: false }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Add API", exact: true }).click();
+  await expect(method).toHaveText("GET");
+  await expect(
+    page.getByLabel("Response contains", { exact: false }),
+  ).toBeEnabled();
+  await method.click();
+  await page.getByLabel("Name", { exact: true }).click();
+  await expect(options).toBeHidden();
+  await expect(page.getByLabel("Name", { exact: true })).toBeFocused();
+  await method.click();
+  await page.waitForTimeout(2200);
+  await expect(options).toBeVisible();
+  await expect(method).toBeFocused();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await method.press("Escape");
+  await page.setViewportSize({ width: 375, height: 812 });
+  await method.focus();
+  await method.evaluate((node) =>
+    scrollTo({
+      top: node.getBoundingClientRect().top + scrollY - 250,
+      behavior: "instant",
+    }),
+  );
+  const scrollBeforeOpen = await page.evaluate(() => scrollY);
+  await method.press("ArrowDown");
+  expect(await page.evaluate(() => scrollY)).toBe(scrollBeforeOpen);
+  const bounds = await options.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(375);
+  expect(bounds!.y).toBeGreaterThanOrEqual(0);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(812);
+  await options.getByRole("option", { name: "HEAD", exact: true }).click();
+  const name = `head-health-${Date.now()}`;
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page
+    .getByLabel("API URL", { exact: true })
+    .fill("http://127.0.0.1:4182/health");
+  await page.getByLabel("Check interval (seconds)").fill("5");
+  await page.getByLabel("Timeout (seconds)").fill("1");
+  const sent = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && request.url().endsWith("/api/targets"),
+  );
+  await page.getByRole("button", { name: "Save & start monitoring" }).click();
+  expect((await sent).postDataJSON()).toMatchObject({
+    method: "HEAD",
+    expected_body_contains: null,
+  });
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(page.locator("#history-rows")).toContainText("200", {
+    timeout: 8000,
+  });
+});
+
+test("shared dropdown handles required values, disabled options and multiple controls", async ({
+  page,
+}) => {
+  await selectDemo(page);
+  await page.getByRole("button", { name: "Add API", exact: true }).click();
+  await page.evaluate(() => {
+    const form = document.createElement("form");
+    form.id = "dropdown-fixture";
+    const fieldset = document.createElement("fieldset");
+    const label = document.createElement("label");
+    label.htmlFor = "fixture-choice";
+    label.textContent = "Fixture choice";
+    const select = document.createElement("select");
+    select.id = "fixture-choice";
+    select.name = "choice";
+    select.required = true;
+    for (const [text, value, disabled] of [
+      ["Choose a value", "", false],
+      ["Unavailable", "unavailable", true],
+      ["Alpha", "alpha", false],
+      ["Beta", "beta", false],
+    ] as const) {
+      const option = new Option(text, value);
+      option.disabled = disabled;
+      select.append(option);
+    }
+    fieldset.append(label, select);
+    form.append(fieldset);
+    document.querySelector("main")!.append(form);
+    (
+      window as unknown as { LookOutDropdowns: { enhance: () => void } }
+    ).LookOutDropdowns.enhance();
+  });
+  const choice = page.getByRole("combobox", {
+    name: "Fixture choice",
+    exact: true,
+  });
+  expect(
+    await page
+      .locator("#dropdown-fixture")
+      .evaluate((form) => (form as HTMLFormElement).reportValidity()),
+  ).toBe(false);
+  await expect(choice).toBeFocused();
+  await expect(choice).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#fixture-choice-validation")).toBeVisible();
+  await choice.press("ArrowDown");
+  await choice.press("ArrowDown");
+  await choice.press("Enter");
+  await expect(choice).toHaveText("Alpha");
+  await expect(page.locator("#fixture-choice-validation")).toBeHidden();
+  expect(
+    await page
+      .locator("#dropdown-fixture")
+      .evaluate((form) => new FormData(form as HTMLFormElement).get("choice")),
+  ).toBe("alpha");
+  await choice.click();
+  await page.getByRole("combobox", { name: "Method", exact: true }).click();
+  await expect(
+    page.getByRole("listbox", { name: "Fixture choice", exact: true }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("listbox", { name: "Method", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Method", exact: true })
+    .press("Escape");
+  await page.locator("#dropdown-fixture fieldset").evaluate((fieldset) => {
+    (fieldset as HTMLFieldSetElement).disabled = true;
+  });
+  await expect(choice).toBeDisabled();
+  await page.locator("#dropdown-fixture fieldset").evaluate((fieldset) => {
+    (fieldset as HTMLFieldSetElement).disabled = false;
+  });
+  await expect(choice).toBeEnabled();
+  await page
+    .locator("#dropdown-fixture")
+    .evaluate((form) => (form as HTMLFormElement).reset());
+  await expect(choice).toHaveText("Choose a value");
+  await page.route("**/dropdown.js", (route) => route.abort());
+  await page.reload();
+  await page.getByRole("button", { name: "Add API", exact: true }).click();
+  await expect(page.locator("#api-method")).toBeVisible();
+});

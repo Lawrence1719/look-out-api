@@ -282,6 +282,7 @@
       snapshot?.add_api_unavailable ||
       "Adding APIs is unavailable for this monitor.";
     byId("add-api-panel").hidden = !formOpen;
+    if (!formOpen) window.LookOutDropdowns?.close();
     byId("add-api-save").disabled = !canAdd || saving;
     byId("add-api-save").textContent = saving
       ? "Saving…"
@@ -492,7 +493,8 @@
       const invalid = form.querySelector('[data-focus-error="true"]');
       if (invalid) {
         invalid.removeAttribute("data-focus-error");
-        invalid.focus();
+        if (window.LookOutDropdowns) window.LookOutDropdowns.focus(invalid);
+        else invalid.focus();
       }
     }
   });
