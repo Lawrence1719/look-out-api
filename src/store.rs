@@ -15,11 +15,12 @@ pub struct Store {
     pub pool: SqlitePool,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, serde::Serialize, FromRow)]
 pub struct TargetStatus {
     pub name: String,
     pub r#type: String,
     pub status: String,
+    pub paused: bool,
     pub interval_secs: i64,
     pub last_checked_at: Option<String>,
     pub consecutive_fail: i64,
@@ -36,7 +37,7 @@ pub struct Notification {
     pub last_error: Option<String>,
     pub permanent_failure: bool,
 }
-#[derive(Debug, FromRow)]
+#[derive(Debug, serde::Serialize, FromRow)]
 pub struct HistoryRow {
     pub checked_at: String,
     pub ok: bool,
@@ -72,6 +73,28 @@ impl Store {
                 .execute(&mut *tx)
                 .await?;
         }
+        tx.commit().await?;
+        Ok(())
+    }
+    pub async fn register_target(
+        &self,
+        target: &crate::config::Target,
+        defaults: &crate::config::Defaults,
+    ) -> anyhow::Result<()> {
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO targets(name,type,interval_secs,created_at) VALUES(?,?,?,?) RETURNING id",
+        )
+        .bind(&target.name)
+        .bind(target.kind.as_str())
+        .bind(target.interval(defaults) as i64)
+        .bind(Utc::now().to_rfc3339())
+        .fetch_one(&mut *tx)
+        .await?;
+        sqlx::query("INSERT INTO target_state(target_id) VALUES(?)")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -153,7 +176,26 @@ impl Store {
         Ok(transition)
     }
     pub async fn statuses(&self) -> anyhow::Result<Vec<TargetStatus>> {
-        Ok(sqlx::query_as("SELECT t.name,t.type,t.interval_secs,s.status,s.last_checked_at,s.consecutive_fail,s.consecutive_ok FROM targets t JOIN target_state s ON s.target_id=t.id WHERE t.active=1 ORDER BY t.name").fetch_all(&self.pool).await?)
+        Ok(sqlx::query_as("SELECT t.name,t.type,t.interval_secs,t.paused,s.status,s.last_checked_at,s.consecutive_fail,s.consecutive_ok FROM targets t JOIN target_state s ON s.target_id=t.id WHERE t.active=1 ORDER BY t.name").fetch_all(&self.pool).await?)
+    }
+    pub async fn paused(&self, name: &str) -> anyhow::Result<bool> {
+        Ok(
+            sqlx::query_scalar("SELECT paused FROM targets WHERE name=? AND active=1")
+                .bind(name)
+                .fetch_one(&self.pool)
+                .await?,
+        )
+    }
+    pub async fn set_paused(&self, name: &str, paused: bool) -> anyhow::Result<bool> {
+        Ok(
+            sqlx::query("UPDATE targets SET paused=? WHERE name=? AND active=1")
+                .bind(paused)
+                .bind(name)
+                .execute(&self.pool)
+                .await?
+                .rows_affected()
+                > 0,
+        )
     }
     pub async fn history(&self, name: &str, limit: u32) -> anyhow::Result<Vec<HistoryRow>> {
         Ok(sqlx::query_as("SELECT c.checked_at,c.ok,c.status_code,c.latency_ms,c.failed_step,c.error FROM checks c JOIN targets t ON c.target_id=t.id WHERE t.name=? ORDER BY c.id DESC LIMIT ?").bind(name).bind(i64::from(limit)).fetch_all(&self.pool).await?)

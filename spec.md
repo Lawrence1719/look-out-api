@@ -408,6 +408,9 @@ Use responsive, accessible static pages with a descriptive page title, descripti
 ### Phase 5 — Reports + status page (optional)
 - [x] `look-out-api report`: sample-based availability, successful avg/p95 latency, incident count
 - [x] `axum` status page at `LOOK_OUT_API_BIND`
+- [x] Loopback-only live dashboard with real scheduled history, incident visibility, and manual configured-target tests; manual tests do not advance incident state. See [dashboard guide](./docs/dashboard.md).
+- [x] Add GET/HEAD HTTP APIs in the local dashboard, persist configuration, and start scheduled monitoring without a daemon restart. Advanced TOML edits still require restart.
+- [x] Pause/resume individual targets from the local dashboard; retain configuration/history and durable pause state across daemon restart with the same database.
 - [x] Static information UI: no emojis, sidebar navigation, responsive layouts, custom scrollbars, Motion animation with reduced-motion support, Lucide icons, and the impeccable design workflow
 
 ### Phase 5b — Security checks

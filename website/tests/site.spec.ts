@@ -112,6 +112,19 @@ test("exported pages load without script errors and expose share metadata", asyn
   await expect(
     page.getByRole("heading", { name: "Start your watch." }),
   ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "On this page" })
+    .getByRole("link", { name: "Dashboard", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Monitor from your browser" }),
+  ).toBeVisible();
+  await expect(page.locator("#dashboard")).toContainText(
+    "Save & start monitoring",
+  );
+  await expect(
+    page.getByRole("link", { name: "open the local dashboard", exact: true }),
+  ).toHaveAttribute("href", "http://127.0.0.1:8080/");
   expect(errors).toEqual([]);
 });
 

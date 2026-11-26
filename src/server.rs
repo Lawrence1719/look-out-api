@@ -1,24 +1,320 @@
-use crate::store::Store;
+use crate::{
+    dashboard::{ControlError, Dashboard, RunError},
+    registration::{AddError, NewApi},
+    store::Store,
+};
 use axum::{
-    extract::{Path, State},
+    extract::{rejection::JsonRejection, DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
-    response::Html,
+    middleware,
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 
 #[derive(Clone)]
 struct ServerState {
     store: Store,
     token: Option<String>,
+    dashboard: Option<Dashboard>,
 }
 
 pub fn router(store: Store, token: Option<String>) -> Router {
+    dashboard_router(store, token, None)
+}
+pub fn dashboard_router(
+    store: Store,
+    token: Option<String>,
+    dashboard: Option<Dashboard>,
+) -> Router {
     Router::new()
-        .route("/", get(status))
+        .route("/", get(home))
+        .route("/dashboard.css", get(styles))
+        .route("/status.css", get(|| async { ([("content-type", "text/css")], "body{font:16px system-ui;background:#f7f7f2;color:#232721;margin:3rem auto;padding:0 1rem;max-width:60rem}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:1rem;border-bottom:1px solid #ccd0c5}") }))
+        .route("/dashboard.js", get(script))
+        .route("/dropdown.js", get(dropdown_script))
+        .route("/fonts/{name}", get(font_asset))
+        .route("/api/dashboard", get(snapshot))
+        .route("/api/targets", post(add_api).layer(DefaultBodyLimit::max(16 * 1024)))
+        .route("/api/targets/{name}/check", post(run_check))
+        .route("/api/targets/{name}/pause", post(pause_target))
+        .route("/api/targets/{name}/resume", post(resume_target))
         .route("/healthz", get(|| async { "ok" }))
         .route("/heartbeat/{name}", post(heartbeat))
-        .with_state(ServerState { store, token })
+        .layer(middleware::map_response(security_headers))
+        .with_state(ServerState {
+            store,
+            token,
+            dashboard,
+        })
+}
+async fn security_headers(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert("cache-control", "no-store".parse().expect("static header"));
+    headers.insert(
+        "x-content-type-options",
+        "nosniff".parse().expect("static header"),
+    );
+    headers.insert(
+        "referrer-policy",
+        "no-referrer".parse().expect("static header"),
+    );
+    headers.insert("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'".parse().expect("static header"));
+    response
+}
+fn local_host(headers: &HeaderMap) -> Result<String, StatusCode> {
+    let authority = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<axum::http::uri::Authority>().ok())
+        .ok_or(StatusCode::FORBIDDEN)?;
+    if !matches!(
+        authority.host(),
+        "localhost" | "127.0.0.1" | "[::1]" | "::1"
+    ) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(authority.to_string())
+}
+fn local_dashboard<'a>(
+    state: &'a ServerState,
+    headers: &HeaderMap,
+) -> Result<&'a Dashboard, StatusCode> {
+    let dashboard = state.dashboard.as_ref().ok_or(StatusCode::NOT_FOUND)?;
+    local_host(headers)?;
+    Ok(dashboard)
+}
+async fn home(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<Html<String>, StatusCode> {
+    if state.dashboard.is_none() {
+        return status(State(state)).await;
+    }
+    local_dashboard(&state, &headers)?;
+    let (site, docs) = information_links(std::env::var("LOOK_OUT_API_SITE_URL").ok().as_deref());
+    Ok(Html(
+        include_str!("dashboard/index.html")
+            .replace("__LOOK_OUT_SITE_URL__", &site)
+            .replace("__LOOK_OUT_DOCS_URL__", &docs),
+    ))
+}
+// This is an optional public information-site location, never a request target or credential.
+fn information_links(configured: Option<&str>) -> (String, String) {
+    const DEFAULT: &str = "https://lawrence1719.github.io/look-out-api/";
+    let valid = configured
+        .and_then(|value| url::Url::parse(value).ok())
+        .filter(|url| {
+            matches!(url.scheme(), "http" | "https")
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.query().is_none()
+                && url.fragment().is_none()
+        });
+    let mut site = valid.unwrap_or_else(|| url::Url::parse(DEFAULT).expect("static site URL"));
+    if !site.path().ends_with('/') {
+        site.set_path(&format!("{}/", site.path()));
+    }
+    let docs = site.join("docs/").expect("relative documentation URL");
+    (escape(site.as_str()), escape(docs.as_str()))
+}
+async fn styles(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, StatusCode> {
+    local_dashboard(&state, &headers)?;
+    Ok((
+        [("content-type", "text/css; charset=utf-8")],
+        include_str!("dashboard/dashboard.css"),
+    ))
+}
+async fn script(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, StatusCode> {
+    local_dashboard(&state, &headers)?;
+    Ok((
+        [("content-type", "text/javascript; charset=utf-8")],
+        include_str!("dashboard/dashboard.js"),
+    ))
+}
+async fn dropdown_script(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, StatusCode> {
+    local_dashboard(&state, &headers)?;
+    Ok((
+        [("content-type", "text/javascript; charset=utf-8")],
+        include_str!("dashboard/dropdown.js"),
+    ))
+}
+async fn font_asset(
+    State(state): State<ServerState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(code) = local_dashboard(&state, &headers) {
+        return code.into_response();
+    }
+    let asset: (&str, &[u8]) = match name.as_str() {
+        "manrope.woff2" => (
+            "font/woff2",
+            include_bytes!("dashboard/fonts/manrope.woff2"),
+        ),
+        "dm-sans.woff2" => (
+            "font/woff2",
+            include_bytes!("dashboard/fonts/dm-sans.woff2"),
+        ),
+        "LICENSE.txt" => (
+            "text/plain; charset=utf-8",
+            include_bytes!("dashboard/fonts/LICENSE.txt"),
+        ),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    ([("content-type", asset.0)], asset.1).into_response()
+}
+async fn snapshot(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, StatusCode> {
+    let dashboard = local_dashboard(&state, &headers)?;
+    dashboard
+        .snapshot()
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+fn require_action(headers: &HeaderMap, action: &str) -> Result<(), StatusCode> {
+    let host = local_host(headers)?;
+    let origin = format!("http://{host}");
+    if headers.get("origin").and_then(|value| value.to_str().ok()) != Some(origin.as_str())
+        || headers
+            .get("x-look-out-action")
+            .and_then(|value| value.to_str().ok())
+            != Some(action)
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(())
+}
+async fn add_api(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+    payload: Result<Json<NewApi>, JsonRejection>,
+) -> Response {
+    let dashboard = match local_dashboard(&state, &headers) {
+        Ok(dashboard) => dashboard.clone(),
+        Err(code) => return code.into_response(),
+    };
+    if require_action(&headers, "add-api").is_err() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error":"Use the local dashboard to add APIs."})),
+        )
+            .into_response();
+    }
+    let input = match payload {
+        Ok(Json(input)) => input,
+        Err(error) => {
+            return (
+                if error.status() == StatusCode::PAYLOAD_TOO_LARGE {
+                    StatusCode::PAYLOAD_TOO_LARGE
+                } else {
+                    StatusCode::BAD_REQUEST
+                },
+                Json(serde_json::json!({"error":"Check the form fields and try again."})),
+            )
+                .into_response()
+        }
+    };
+    // Finish a save even when the browser disconnects. The config is the restart recovery source.
+    match tokio::spawn(async move { dashboard.add_api(input).await }).await {
+        Ok(Ok(added)) => (if added.monitoring { StatusCode::CREATED } else { StatusCode::ACCEPTED }, Json(added)).into_response(),
+        Ok(Err(error)) => {
+            let status = match error { AddError::Invalid(_,_) => StatusCode::BAD_REQUEST, AddError::Duplicate|AddError::Changed|AddError::Busy => StatusCode::CONFLICT, AddError::Disabled => StatusCode::SERVICE_UNAVAILABLE, AddError::Storage => StatusCode::INTERNAL_SERVER_ERROR };
+            (status, Json(serde_json::json!({"error":error.message(),"field":error.field()}))).into_response()
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"The save result is uncertain. Refresh before trying again."}))).into_response(),
+    }
+}
+async fn run_check(
+    State(state): State<ServerState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let dashboard = match local_dashboard(&state, &headers) {
+        Ok(dashboard) => dashboard,
+        Err(code) => return code.into_response(),
+    };
+    if require_action(&headers, "run-check").is_err() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error":"Use the local dashboard to run checks."})),
+        )
+            .into_response();
+    }
+    match dashboard.manual(&name).await {
+        Ok(result) => Json(result).into_response(),
+        Err(RunError::Missing) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error":"Target is not configured."})),
+        )
+            .into_response(),
+        Err(RunError::Busy) => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"error":"A check is already running. Try again shortly."})),
+        )
+            .into_response(),
+    }
+}
+async fn pause_target(
+    State(state): State<ServerState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    change_monitoring(state, name, headers, true).await
+}
+async fn resume_target(
+    State(state): State<ServerState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    change_monitoring(state, name, headers, false).await
+}
+async fn change_monitoring(
+    state: ServerState,
+    name: String,
+    headers: HeaderMap,
+    paused: bool,
+) -> Response {
+    let dashboard = match local_dashboard(&state, &headers) {
+        Ok(dashboard) => dashboard.clone(),
+        Err(code) => return code.into_response(),
+    };
+    if require_action(
+        &headers,
+        if paused {
+            "pause-target"
+        } else {
+            "resume-target"
+        },
+    )
+    .is_err()
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error":"Use the local dashboard to change monitoring."})),
+        )
+            .into_response();
+    }
+    // Finish an admitted state change even if the client stops waiting.
+    match tokio::spawn(async move { dashboard.set_paused(&name, paused).await }).await {
+        Ok(Ok(change)) => Json(change).into_response(),
+        Ok(Err(ControlError::Missing)) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"Target is not configured."}))).into_response(),
+        Ok(Err(ControlError::Storage)) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"Monitoring could not be changed. Check database access and refresh before retrying."}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"The monitoring change is uncertain. Refresh before retrying."}))).into_response(),
+    }
 }
 async fn heartbeat(
     State(state): State<ServerState>,
@@ -58,7 +354,9 @@ async fn status(State(state): State<ServerState>) -> Result<Html<String>, Status
                 (chrono::Utc::now() - time.with_timezone(&chrono::Utc)).num_seconds()
                     > target.interval_secs * 2
             });
-        let label = if stale {
+        let label = if target.paused {
+            "paused"
+        } else if stale {
             "unknown / stale"
         } else {
             &target.status
@@ -70,11 +368,46 @@ async fn status(State(state): State<ServerState>) -> Result<Html<String>, Status
             escape(label)
         ));
     }
-    Ok(Html(format!("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Look Out API status</title><style>body{{font:16px system-ui;background:#f7f7f2;color:#232721;margin:3rem auto;padding:0 1rem;max-width:60rem}}table{{width:100%;border-collapse:collapse}}td,th{{text-align:left;padding:1rem;border-bottom:1px solid #ccd0c5}}a{{color:#b33f1e}}</style><body><h1>Look Out API</h1><p>Local monitoring status. Stale observations are shown as unknown.</p><table><thead><tr><th>Target</th><th>Check</th><th>Observed status</th></tr></thead><tbody>{rows}</tbody></table></body></html>")))
+    Ok(Html(format!("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Look Out API status</title><link rel=\"stylesheet\" href=\"/status.css\"><body><h1>Look Out API</h1><p>Local monitoring status. Stale observations are shown as unknown.</p><table><thead><tr><th>Target</th><th>Check</th><th>Observed status</th></tr></thead><tbody>{rows}</tbody></table></body></html>")))
 }
 fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+#[cfg(test)]
+mod information_link_tests {
+    use super::information_links;
+    #[test]
+    fn information_links_keep_base_paths_and_reject_unsafe_overrides() {
+        assert_eq!(
+            information_links(Some("http://127.0.0.1:3000")),
+            (
+                "http://127.0.0.1:3000/".into(),
+                "http://127.0.0.1:3000/docs/".into()
+            )
+        );
+        assert_eq!(
+            information_links(Some("https://example.invalid/project")),
+            (
+                "https://example.invalid/project/".into(),
+                "https://example.invalid/project/docs/".into()
+            )
+        );
+        for invalid in [
+            "javascript:alert(1)",
+            "file:///private/file",
+            "https://user:secret@example.invalid",
+            "https://example.invalid/?secret=value",
+            "https://example.invalid/#fragment",
+        ] {
+            assert_eq!(information_links(Some(invalid)), information_links(None));
+        }
+        assert!(!information_links(Some("https://example.invalid/a'b"))
+            .0
+            .contains('\''));
+    }
 }

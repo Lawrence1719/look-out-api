@@ -68,7 +68,9 @@ Leave it running. In a second terminal, change to the **same repository director
 ./target/release/look-out-api run --bind 127.0.0.1:8080
 ```
 
-`check` should print `PASS` for `local-api`. The daemon records observations every 30 seconds. Open [the local status page](http://127.0.0.1:8080). When the daemon runs on another machine, `127.0.0.1` refers to that machine; use an SSH tunnel to access its loopback-only page.
+`check` should print `PASS` for `local-api`. The daemon records observations every 30 seconds. Open [the local dashboard](http://127.0.0.1:8080). When the daemon runs on another machine, `127.0.0.1` refers to that machine; use an SSH tunnel to access its loopback-only page.
+
+Use **Run check** in the dashboard to execute a real manual test and inspect its result. Manual tests do not change incidents or send alerts. See the [dashboard guide](../dashboard.md).
 
 In another terminal in the same repository directory:
 

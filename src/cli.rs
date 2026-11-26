@@ -38,7 +38,7 @@ pub enum Command {
         #[arg(
             long,
             env = "LOOK_OUT_API_BIND",
-            help = "Enable local status/heartbeat server, e.g. 127.0.0.1:8080"
+            help = "Enable local dashboard/status/heartbeat server, e.g. 127.0.0.1:8080"
         )]
         bind: Option<String>,
     },
