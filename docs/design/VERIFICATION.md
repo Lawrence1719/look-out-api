@@ -205,3 +205,10 @@ Native Windows/Linux interactive walkthroughs, broad assistive-technology review
 - The owner's local database was privately backed up before migration and the updated release monitor started successfully with its original single target still running. Pause is an intentional per-target control; manual checks stay available and already queued notifications may still be delivered in order. Resume follows the saved schedule. No target deletion is included.
 
 Native Windows/Linux interactive walkthroughs, physical mobile input, and broader human assistive-technology checks remain unverified. Hosted CI status must be checked separately from these local results.
+
+
+## Input placeholder refinement
+
+2026-11-26 · Agent: codex · Branch: `feat/local-dashboard`.
+
+Added example placeholders to the Add API name, response text, and numeric fields; the URL already had an example. All six inputs now have nonempty placeholders. Persistent labels, optional-field meaning, GET selection, actual defaults, and validation are unchanged. Local-fixture browser checks verified placeholders, empty drafts, defaults, reset behavior, and mobile containment. Desktop (1440px) and mobile (375px) renders were visually inspected, including cleared numeric fields. Rust formatting, locked Clippy, all 38 tests, and release build passed; website clean install, formatting, typecheck, static build, and all six static-site browser tests passed. No production targets or owner credentials were used by these checks.
